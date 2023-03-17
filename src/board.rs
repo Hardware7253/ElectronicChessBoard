@@ -2,33 +2,45 @@ pub mod board_representation {
 
     #[derive(PartialEq, Debug)]
     pub struct Points { 
-        white_points: usize,
-        black_points: usize,
+        white_points: u8,
+        black_points: u8,
     }
+
+    // Indexes for bitboards
+    // White pawn = 0
+    // White rook = 1
+    // White knight = 2
+    // White bishop = 3
+    // White queen = 4
+    // White king = 5
+
+    // Black pawn = 6
+    // Black rook = 7
+    // Black knight = 8
+    // Black bishop = 9
+    // Black queen = 10
+    // Black king = 11
+
+    // Last bitboard (index 12) is for moves
     
-    // IDS defines how indexes on the board array corresponds to piece bitboards
-    // Last index is for a moves board
-    //                            PP, RR, NN, BB, QQ, KK, pp, rr, nn, bb, qq, kk, 00 
-    pub const IDS: [usize; 13] = [00, 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12];
-
-    // Char identifier for a piece, uses the same order as IDS
-    pub const CHAR_IDS: [char; 12] = ['P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'];
-
     #[derive(PartialEq, Debug)]
     pub struct Board {
         board: [u64; 13],
         whites_move: bool,
         points: Points,
-        turns_since_capture: usize,
+        turns_since_capture: u8,
         en_passant_target: usize,
     }
 
     // Layout of one bitboard
     // The top left square is bit 0 and the bottom right square is bit 63
+    // y is flipped for easier math throughout the program
     // Snakes likes this
-    // 0, 1, 2
-    // 3, 4, 5
-    // 6, 7, 8
+    //   0 | 0, 1, 2
+    //   1 | 3, 4, 5
+    //   2 | 6, 7, 8
+    //   y |--------
+    //     x 0, 1, 2
     // Bitboards do not need to be flipped to perspective of moving team
 
     impl Board {
@@ -144,7 +156,7 @@ pub mod board_representation {
             // Set turns since last capture
             if spaces == 4 {
                 board.turns_since_capture *= 10;
-                board.turns_since_capture += <i8 as TryInto<usize>>::try_into(char_num).unwrap();
+                board.turns_since_capture += char_num as u8;
             }
 
             // Ignore the rest of the fen code
@@ -164,8 +176,10 @@ pub mod board_representation {
     }
 
     fn piece_index_from_char(character: char) -> Result<usize, ()> {
-        for i in 0..CHAR_IDS.len() {
-            if character == CHAR_IDS[i] {
+        // Chars correspond to piece index on bitboard array
+        let char_ids = ['P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'];
+        for i in 0..char_ids.len() {
+            if character == char_ids[i] {
                 return Ok(i);
             }
         }
@@ -212,7 +226,39 @@ pub mod board_representation {
 }
 
 pub mod move_generator {
-    pub fn gen_piece() {
+    use super::*;
 
+    pub fn gen_piece() -> u64 {
+        0
+    }
+
+    // Returns a bitboard where a piece is moved from inital by delta bit
+    // Only moves if the piece will still be on the board
+    fn move_piece(initial_bit: usize, delta_bit: i8) -> Result<u64, ()> {
+        use crate::bit_move_valid;
+
+        if bit_move_valid(initial_bit, delta_bit) {
+            let mut move_bitboard = 1 << initial_bit; // Set move bitboard to have piece at initial_bit
+
+            // Shift left / right dependign on delta_bit
+            if delta_bit > 0 {
+                move_bitboard = move_bitboard << delta_bit.abs();
+            } else {
+                move_bitboard = move_bitboard >> delta_bit.abs();
+            }
+            return Ok(move_bitboard);
+        }
+        Err(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        
+        #[test]
+        fn move_piece_test() {
+            assert_eq!(move_piece(60, -8), Ok(1 << 52));
+            assert_eq!(move_piece(63, -15), Err(()));
+        }
     }
 }
