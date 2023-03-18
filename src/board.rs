@@ -25,11 +25,17 @@ pub mod board_representation {
     
     #[derive(PartialEq, Debug)]
     pub struct Board {
-        board: [u64; 13],
-        whites_move: bool,
-        points: Points,
-        turns_since_capture: u8,
-        en_passant_target: usize,
+        pub board: [u64; 13],
+        pub whites_move: bool,
+        pub points: Points,
+        pub turns_since_capture: u8,
+        pub en_passant_target: usize,
+    }
+
+    // Coordinates used to reference a single piece on the board
+    pub struct BoardCoordinates {
+        pub board_index: usize,
+        pub bit: usize,
     }
 
     // Layout of one bitboard
@@ -46,7 +52,7 @@ pub mod board_representation {
     impl Board {
 
         // Create empty board
-        fn new() -> Self {
+        pub fn new() -> Self {
             Board {
                 board: [0; 13],
                 whites_move: true,
@@ -228,8 +234,70 @@ pub mod board_representation {
 pub mod move_generator {
     use super::*;
 
-    pub fn gen_piece() -> u64 {
-        0
+    pub fn gen_piece(piece: board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> u64 {
+        use crate::bit_on;
+        let piece_info = &pieces_info[piece.board_index];
+        let initial_piece_bitboard = 1 << piece.bit;
+
+        // Stores all the valid moves for the given piece
+        let mut moves_bitboard = 0;
+
+        if !only_gen_attacks && {piece.board_index != 0 || piece.board_index != 6} // Do not generate regular moves for pawns if only_gen_attacks is true
+        {
+            for i in 0..piece_info.moves_no {
+
+                // Stores the current piece bitboard (where the piece is isolated so that it is the only thing on the bitboard)
+                let mut piece_bitboard = initial_piece_bitboard;
+                
+                let move_delta_bit = piece_info.moves[i];
+    
+                let mut piece_bit = piece.bit;
+                loop {
+                    match move_piece(piece_bit, move_delta_bit) {
+                        Ok(bitboard) => {
+                            let piece_bit_i8: i8 = piece_bit.try_into().unwrap();
+                            let piece_move_bit = usize::try_from(piece_bit_i8 + move_delta_bit).unwrap();
+    
+                            // If a friendly piece is in the way of the move break the loop so the piece cannot move there
+                            if bit_on(team_bitboards.friendly_team, piece_move_bit) {
+                                break;
+                            }
+    
+                            let mut break_after_move = false;
+                            // If an enemy piece is in the way of the move break after the move, so the piece can capture it and then stop moving in that direction
+                            if bit_on(team_bitboards.enemy_team, piece_move_bit) {
+    
+                                // If the piece can only move don't allow it to capture
+                                if piece_info.move_only {
+                                    break;
+                                }
+                                break_after_move = true;
+                            }
+    
+                            // Update bitboards
+                            moves_bitboard |= bitboard;
+                            piece_bitboard = bitboard;
+    
+                            if break_after_move {
+                                break;
+                            }
+                            
+    
+                            // Update piece_bit to make it current with the pieces location after the move
+                            piece_bit = piece_move_bit;
+                        },
+                        Err(()) => break,
+                    }
+    
+                    // If the piece doesn't slide break the while loop so it can only move once in each direction
+                    if !piece_info.sliding {
+                        break;
+                    }
+                }
+            }
+        }
+        
+        moves_bitboard
     }
 
     // Returns a bitboard where a piece is moved from inital by delta bit
@@ -253,12 +321,37 @@ pub mod move_generator {
 
     #[cfg(test)]
     mod tests {
+        use board_representation::BoardCoordinates;
+        use board_representation::fen_decode;
+        use crate::TeamBitboards;
         use super::*;
         
         #[test]
         fn move_piece_test() {
             assert_eq!(move_piece(60, -8), Ok(1 << 52));
             assert_eq!(move_piece(63, -15), Err(()));
+        }
+
+        #[test]
+        fn gen_piece_test() {
+            use crate::TeamBitboards;
+            //use crate::
+            let board = fen_decode("3p4/8/6p1/1P6/8/3Q3P/8/5p2 w - - 0 1", true);
+
+            let piece = BoardCoordinates {
+                board_index: 4,
+                bit: 43,
+            };
+
+            let team_bitboards = TeamBitboards::new(piece.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let result = gen_piece(piece, team_bitboards, false, &pieces_info);
+
+            let expected: u64 = 3034431211759470600;
+            
+            assert_eq!(result, expected);
         }
     }
 }
