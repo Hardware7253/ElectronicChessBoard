@@ -29,7 +29,7 @@ pub mod board_representation {
         pub whites_move: bool,
         pub points: Points,
         pub turns_since_capture: u8,
-        pub en_passant_target: usize,
+        pub en_passant_target: Option<usize>,
     }
 
     // Coordinates used to reference a single piece on the board
@@ -61,7 +61,7 @@ pub mod board_representation {
                     black_points: 0,
                 },
                 turns_since_capture: 0,
-                en_passant_target: 0,
+                en_passant_target: None,
             }
         }
 
@@ -154,7 +154,7 @@ pub mod board_representation {
             if spaces == 3 && fen_char != ' '{
                 ccn.push(fen_char);
                 match crate::ccn_to_i(&ccn) {
-                    Ok(bit) =>  board.en_passant_target = bit,
+                    Ok(bit) =>  board.en_passant_target = Some(bit),
                     Err(()) => (),
                 }
             }
@@ -219,7 +219,7 @@ pub mod board_representation {
             expected.board[12] ^= 1;
 
             // En passant conditions
-            expected.en_passant_target = 44;
+            expected.en_passant_target = Some(44);
 
             // Half moves
             expected.turns_since_capture = 50;
@@ -234,24 +234,46 @@ pub mod board_representation {
 pub mod move_generator {
     use super::*;
 
-    pub fn gen_piece(piece: board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> u64 {
+    #[derive(PartialEq, Debug)]
+    pub struct Moves {
+        pub moves_bitboard: u64,
+        pub en_passant_target_bit: Option<usize>,
+        pub en_passant_capture_bit: Option<usize>,
+    }
+
+    pub fn gen_piece(piece: board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Moves {
         use crate::bit_on;
+
         let piece_info = &pieces_info[piece.board_index];
-        let initial_piece_bitboard = 1 << piece.bit;
+        let initial_piece_bitboard = 1 << piece.bit; // Stores a bitboard where the piece is isolated
 
-        // Stores all the valid moves for the given piece
-        let mut moves_bitboard = 0;
+        let mut moves = Moves {
+            moves_bitboard: 0,
+            en_passant_target_bit: None,
+            en_passant_capture_bit: None,
+        };
 
-        if !only_gen_attacks && {piece.board_index != 0 || piece.board_index != 6} // Do not generate regular moves for pawns if only_gen_attacks is true
-        {
+        let mut piece_pawn = false;
+        if piece.board_index == 0 || piece.board_index == 6 {
+            piece_pawn = true;
+        }
+
+        // Initialize moves with pawn capture moves if the piece is a pawn
+        if piece_pawn {
+            moves = gen_pawn_captures(&piece, team_bitboards, &board);
+        }
+
+        if only_gen_attacks && piece_pawn // Do not generate regular moves for pawns if only_gen_attacks is true
+        {        
+        } else {
             for i in 0..piece_info.moves_no {
-
-                // Stores the current piece bitboard (where the piece is isolated so that it is the only thing on the bitboard)
                 let mut piece_bitboard = initial_piece_bitboard;
                 
                 let move_delta_bit = piece_info.moves[i];
     
                 let mut piece_bit = piece.bit;
+
+                let mut move_repeated = 0;
                 loop {
                     match move_piece(piece_bit, move_delta_bit) {
                         Ok(bitboard) => {
@@ -275,8 +297,9 @@ pub mod move_generator {
                             }
     
                             // Update bitboards
-                            moves_bitboard |= bitboard;
+                            moves.moves_bitboard |= bitboard;
                             piece_bitboard = bitboard;
+                            move_repeated += 1;
     
                             if break_after_move {
                                 break;
@@ -288,7 +311,18 @@ pub mod move_generator {
                         },
                         Err(()) => break,
                     }
-    
+
+                    // Do not let a pawn move more then 2 times in a turn
+                    if piece_pawn && move_repeated == 2 {
+                        break;
+                    }
+
+                    // Allow a pawn to move 2 times in a turn if it has moved 0 times
+                    if piece_pawn && !bit_on(board.board[12], piece.bit) {
+                        moves.en_passant_target_bit = Some(piece_bit);
+                        continue;
+                    }  
+
                     // If the piece doesn't slide break the while loop so it can only move once in each direction
                     if !piece_info.sliding {
                         break;
@@ -297,7 +331,70 @@ pub mod move_generator {
             }
         }
         
-        moves_bitboard
+        moves
+    }
+
+    // Generates pawn capture moves including en passant, assumes the given piece is a pawn
+    fn gen_pawn_captures(piece: &board_representation::BoardCoordinates, mut team_bitboards: crate::TeamBitboards, board: &board_representation::Board) -> Moves {
+        use crate::bit_on;
+
+        let initial_piece_bitboard: u64 = 1 << piece.bit; // Stores a bitboard where the piece is isolated
+
+        let mut moves_bitboard = 0; // Stores the capture moves for the pawns
+
+        // Add an imaginary piece at the en passant target so a friendly pawn can capture it
+        let en_passant_target_bit = board.en_passant_target.unwrap_or(0);
+        let mut en_passant_target_bitboard: u64 = 0;
+        if en_passant_target_bit != 0 {
+            en_passant_target_bitboard = 1 << en_passant_target_bit;
+        }
+        team_bitboards.enemy_team |= en_passant_target_bitboard;
+
+        // Get capture moves for pawn
+        let capture_moves: [i8; 2];
+        let team_white = crate::board_index_white(piece.board_index);
+        if team_white {
+            capture_moves = [-9, -7];
+        } else {
+            capture_moves = [9, 7];
+        }
+
+        let mut en_passant_capture_bit = None;
+        let piece_bit_i8: i8 = piece.bit.try_into().unwrap();
+        for i in 0..capture_moves.len() {
+            
+            let move_delta_bit = capture_moves[i];
+            let piece_move_bit_i8 = piece_bit_i8 + move_delta_bit;
+            let piece_move_bit = usize::try_from(piece_move_bit_i8).unwrap();
+            //println!("{}", en_passant_target_bit);
+
+            if bit_on(team_bitboards.enemy_team, piece_move_bit) { // Only try to move in an enemy occupies the square that will be moved to
+                match move_piece(piece.bit, move_delta_bit) {
+                    Ok(bitboard) => {
+                        moves_bitboard |= bitboard;
+
+                        // Set en passant capture bit if the piece captured an en passant target bit
+                        if piece_move_bit == en_passant_target_bit {
+                            if team_white {
+                                en_passant_capture_bit = Some(usize::try_from(piece_move_bit_i8 + 8).unwrap());
+                            } else {
+                                en_passant_capture_bit = Some(usize::try_from(piece_move_bit_i8 - 8).unwrap());
+                            }
+                        }
+                    },
+    
+                    Err(()) => continue,
+                }
+            }
+            
+        }
+
+        Moves {
+            moves_bitboard: moves_bitboard,
+            en_passant_target_bit: None,
+            en_passant_capture_bit: en_passant_capture_bit,
+        } 
+
     }
 
     // Returns a bitboard where a piece is moved from inital by delta bit
@@ -333,9 +430,9 @@ pub mod move_generator {
         }
 
         #[test]
-        fn gen_piece_test() {
+        fn gen_piece_test1() { // Test queen sliding and being blocked by friendly and enemy pieces
             use crate::TeamBitboards;
-            //use crate::
+
             let board = fen_decode("3p4/8/6p1/1P6/8/3Q3P/8/5p2 w - - 0 1", true);
 
             let piece = BoardCoordinates {
@@ -347,9 +444,55 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let result = gen_piece(piece, team_bitboards, false, &pieces_info);
+            let result = gen_piece(piece, team_bitboards, false, &board, &pieces_info);
 
             let expected: u64 = 3034431211759470600;
+            
+            assert_eq!(result.moves_bitboard, expected);
+        }
+
+        #[test]
+        fn gen_piece_test2() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("8/8/8/8/8/8/3P4/8 w - - 0 1", true);
+
+            let piece = BoardCoordinates {
+                board_index: 0,
+                bit: 51,
+            };
+
+            let team_bitboards = TeamBitboards::new(piece.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let result = gen_piece(piece, team_bitboards, false, &board, &pieces_info);
+
+            let expected: u64 = 8830452760576;
+            
+            assert_eq!(result.moves_bitboard, expected);
+        }
+
+        #[test]
+        fn gen_pawn_captures_test() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("rnbqkbnr/ppppp1pp/8/8/4Pp2/6P1/PPPP1P1P/RNBQKBNR b KQkq e3 0 1", true);
+
+            let piece = BoardCoordinates {
+                board_index: 6,
+                bit: 37,
+            };
+
+            let team_bitboards = TeamBitboards::new(piece.board_index, &board);
+
+            let result = gen_pawn_captures(&piece, team_bitboards, &board);
+
+            let expected = Moves {
+                moves_bitboard: 87960930222080,
+                en_passant_target_bit: None,
+                en_passant_capture_bit: Some(36),
+            };
             
             assert_eq!(result, expected);
         }

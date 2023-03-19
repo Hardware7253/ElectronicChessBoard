@@ -93,7 +93,7 @@ pub fn bit_on(num: u64, bit: usize) -> bool {
 }
 
 // A struct containing bitboards which have the locations of all pieces on the friendly and enemy team
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct TeamBitboards {
     pub friendly_team: u64,
     pub enemy_team: u64,
