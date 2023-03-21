@@ -241,17 +241,23 @@ pub mod move_generator {
         pub en_passant_capture_bit: Option<usize>,
     }
 
+    impl Moves {
+        fn new() -> Self {
+            Moves {
+                moves_bitboard: 0,
+                en_passant_target_bit: None,
+                en_passant_capture_bit: None,
+            }
+        }
+    }
+
     pub fn gen_piece(piece: board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Moves {
         use crate::bit_on;
 
         let piece_info = &pieces_info[piece.board_index];
         let initial_piece_bitboard = 1 << piece.bit; // Stores a bitboard where the piece is isolated
 
-        let mut moves = Moves {
-            moves_bitboard: 0,
-            en_passant_target_bit: None,
-            en_passant_capture_bit: None,
-        };
+        let mut moves = Moves::new();
 
         let mut piece_pawn = false;
         if piece.board_index == 0 || piece.board_index == 6 {
@@ -397,6 +403,54 @@ pub mod move_generator {
 
     }
 
+    // Assumes the given piece is a king, and that the moves bitboard is accurate
+    fn castle(king: board_representation::BoardCoordinates, king_move_bit: usize, team_bitboards: crate::TeamBitboards, enemy_attack_bitboard: u64, board: &board_representation::Board) -> Result<Moves, ()> {
+        use crate::bit_on;
+
+        // If the king is in check, or has moved don't castle
+        if bit_on(enemy_attack_bitboard, king.bit) || !bit_on(board.board[12], king.bit) {
+            return Err(());
+        }
+
+        let all_pieces_bitboard = team_bitboards.friendly_team | team_bitboards.enemy_team;
+
+        let king_castle_moves: [i8; 2] =         [1, -1];
+        let rook_relative_coordinates: [i8; 2] = [3, -4];
+        let rook_castle_moves: [i8; 2] =          [-2, 3];
+        
+        let mut king_moves_bitboard: u64 = 0;
+
+        for i in 0..king_castle_moves.len() {
+            let mut piece_bit = king.bit;
+
+            // If the rook for this direction has moved the king cannot castle in this direction
+            let rook_bit = (piece_bit as i8 + rook_relative_coordinates[i]).try_into().unwrap();
+            if bit_on(board.board[12], rook_bit) {
+                continue;
+            }
+
+            for j in 0..2 {
+                let piece_move_bit = usize::try_from(piece_bit as i8 + king_castle_moves[i]).unwrap();
+                
+                // Do not allow the king to castle through squares that are attacked or to castle through pieces
+                if bit_on(enemy_attack_bitboard, piece_move_bit) || bit_on(all_pieces_bitboard, piece_move_bit)  {
+                    break;
+                }
+
+                piece_bit = piece_move_bit;
+
+                if i > 0 && piece_move_bit == king_move_bit {
+                    return Ok(Moves {
+                        moves_bitboard: 0,
+                        en_passant_target_bit: Some((rook_bit as i8 + rook_castle_moves[i]).try_into().unwrap()), // Use en passant target to show where a rook should be added on the board
+                        en_passant_capture_bit: Some(rook_bit), // Use en passant capture bit to show where a rook should be removed from the borad
+                    });
+                }
+            }
+        }
+
+        Err(())
+    }
     // Returns a bitboard where a piece is moved from inital by delta bit
     // Only moves if the piece will still be on the board
     fn move_piece(initial_bit: usize, delta_bit: i8) -> Result<u64, ()> {
@@ -495,6 +549,31 @@ pub mod move_generator {
             };
             
             assert_eq!(result, expected);
+        }
+
+        #[test]
+        fn castle_test() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("r3k2r/8/8/8/8/8/8/8 w KQkq - 0 1", true);
+
+            let piece = BoardCoordinates {
+                board_index: 5,
+                bit: 4,
+            };
+
+            let team_bitboards = TeamBitboards::new(piece.board_index, &board);
+
+            let result = castle(piece, 2, team_bitboards, 0, &board);
+
+            let expected = Moves {
+                moves_bitboard: 0,
+                en_passant_target_bit: Some(3),
+                en_passant_capture_bit: Some(0),
+            };
+            
+            assert_eq!(result, Ok(expected));
+
         }
     }
 }
