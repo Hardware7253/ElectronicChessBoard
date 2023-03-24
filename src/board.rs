@@ -33,6 +33,7 @@ pub mod board_representation {
     }
 
     // Coordinates used to reference a single piece on the board
+    #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct BoardCoordinates {
         pub board_index: usize,
         pub bit: usize,
@@ -251,7 +252,7 @@ pub mod move_generator {
         }
     }
 
-    pub fn gen_piece(piece: board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Moves {
+    pub fn gen_piece(piece: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Moves {
         use crate::bit_on;
 
         let piece_info = &pieces_info[piece.board_index];
@@ -459,6 +460,62 @@ pub mod move_generator {
         Err(())
     }
 
+    #[derive(PartialEq, Debug)]
+    pub struct EnemyAttacks {
+        enemy_attack_bitboard: u64,
+        checking_pieces:  [Option<board_representation::BoardCoordinates>; 3],
+    }
+
+    // Generates atacks of enemys to the kings team, stores enemy pieces that put the king in check
+    fn gen_enemy_attacks(king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> EnemyAttacks {
+        use board_representation::BoardCoordinates;
+        use crate::bit_on;
+
+        // Get enemy board indexes
+        let enemy_indexes;
+        if king.board_index < 6 {
+            enemy_indexes = 6..12
+        } else {
+            enemy_indexes = 0..6
+        }
+
+        let mut checking_pieces_no = 0; // Used to index checking_pieces
+        let mut checking_pieces: [Option<BoardCoordinates>; 3] = [None; 3]; // Stores enemy pieces putting the king in check
+
+        let mut enemy_attack_bitboard: u64 = 0;
+
+        // Loop through all enemy pieces
+        for i in enemy_indexes {
+            for j in 0..64 {
+
+                // Skip if there is no piece on the square
+                if !bit_on(board.board[i], j) {
+                    continue;
+                }
+
+                let board_coordinates = BoardCoordinates {
+                    board_index: i,
+                    bit: j,
+                };
+
+                // Get enemy piece moves (attack moves only) and or them into the enemy moves bitboard
+                let piece_moves = gen_piece(&board_coordinates, team_bitboards, true, board, pieces_info);
+                enemy_attack_bitboard |= piece_moves.moves_bitboard;
+
+                // If an enemy attack and king are in the same bit then the king is put in check by that piece
+                if bit_on(piece_moves.moves_bitboard, king.bit) {
+                    checking_pieces[checking_pieces_no] = Some(board_coordinates); // Add piece board coordinates to checking pieces array
+                    checking_pieces_no += 1;
+                }
+            }
+        }
+
+        EnemyAttacks {
+            enemy_attack_bitboard: enemy_attack_bitboard,
+            checking_pieces: checking_pieces,
+        }
+    }
+
     // Note for detecting check and mate
     // Find check by generating moves for enemy pieces 1 by 1, once an enemy move hits the king it is in check.
     // Store the piece(s) that puts the king in check
@@ -517,7 +574,7 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let result = gen_piece(piece, team_bitboards, false, &board, &pieces_info);
+            let result = gen_piece(&piece, team_bitboards, false, &board, &pieces_info);
 
             let expected: u64 = 3034431211759470600;
             
@@ -525,7 +582,7 @@ pub mod move_generator {
         }
 
         #[test]
-        fn gen_piece_test2() {
+        fn gen_piece_test2() { // Test pawn double move
             use crate::TeamBitboards;
 
             let board = fen_decode("8/8/8/8/8/8/3P4/8 w - - 0 1", true);
@@ -539,7 +596,7 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let result = gen_piece(piece, team_bitboards, false, &board, &pieces_info);
+            let result = gen_piece(&piece, team_bitboards, false, &board, &pieces_info);
 
             let expected: u64 = 8830452760576;
             
@@ -591,6 +648,45 @@ pub mod move_generator {
             
             assert_eq!(castle(&piece, 2, &team_bitboards, 0, &board), Ok(expected)); // Valid castle
             assert_eq!(castle(&piece, 2, &team_bitboards, 4, &board), Err(())); // Test an enemy attack blocking the path
+        }
+
+        #[test]
+        fn gen_enemy_attacks_test() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("7r/p5k1/P7/5N2/3B4/8/1P6/8 w - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 14,
+            };
+
+            let team_bitboards = TeamBitboards::new(1, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let result = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let checking_pieces: [Option<BoardCoordinates>; 3] = [
+                Some(BoardCoordinates {
+                    board_index: 2,
+                    bit: 29,
+                }),
+
+                Some(BoardCoordinates {
+                    board_index: 3,
+                    bit: 35,
+                }),
+
+                None,
+            ];
+
+            let expected = EnemyAttacks {
+                enemy_attack_bitboard: 4620786126761382144,
+                checking_pieces: checking_pieces,
+            };
+            
+            assert_eq!(result, expected);
         }
     }
 }

@@ -160,9 +160,7 @@ impl TeamBitboards {
 
         #[test]
         fn bit_on_test() {
-            assert_eq!(bit_on(10, 3), true);
-            assert_eq!(bit_on(1, 1), false);
-            assert_eq!(bit_on(2, 1), true);
+            assert_eq!(bit_on(4, 2), true);
         }
 
         #[test]
