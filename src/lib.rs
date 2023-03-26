@@ -92,6 +92,18 @@ pub fn bit_on(num: u64, bit: usize) -> bool {
     false
 }
 
+// Function returns when it finds what bit is on in a u64 number
+// E.g. 8 would return 3
+// If no bits are on in the number then default will be returned
+pub fn find_bit_on(num: u64, default: usize) -> usize {
+    for i in 0..64 {
+        if bit_on(num, i) {
+            return i;
+        }
+    }
+    default
+}
+
 // A struct containing bitboards which have the locations of all pieces on the friendly and enemy team
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct TeamBitboards {
@@ -161,6 +173,11 @@ impl TeamBitboards {
         #[test]
         fn bit_on_test() {
             assert_eq!(bit_on(4, 2), true);
+        }
+
+        #[test]
+        fn find_bit_on_test() {
+            assert_eq!(find_bit_on(8, 0), 3);
         }
 
         #[test]
