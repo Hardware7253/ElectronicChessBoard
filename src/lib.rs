@@ -86,7 +86,7 @@ pub fn board_index_white(index: usize) -> bool {
 // Returns true if a bit is on in a u64 number
 pub fn bit_on(num: u64, bit: usize) -> bool {
     let num_from_bit = 1 << bit;
-    if num ^ num_from_bit < num{
+    if num ^ num_from_bit < num {
         return true;
     }
     false

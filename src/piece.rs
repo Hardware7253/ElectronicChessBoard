@@ -5,6 +5,8 @@ pub mod constants {
         pub moves_no: usize, // Number of moves is moves array
         pub move_only: bool, // True if the piece cannot capture with its move set
         pub sliding: bool, // True if the piece can move more than one square at a time
+
+        pub value: i8, // Material value of the piece
     }
 
     pub fn gen() -> [PieceInfo; 12] {
@@ -20,6 +22,8 @@ pub mod constants {
                 moves_no: 1,
                 move_only: true,
                 sliding: false,
+
+                value: 1,
             },
 
             PieceInfo { // rook
@@ -27,6 +31,8 @@ pub mod constants {
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
+
+                value: 5,
             },
 
             PieceInfo { // knight
@@ -34,6 +40,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
+
+                value: 3,
             },
 
             PieceInfo { // bishop
@@ -41,6 +49,8 @@ pub mod constants {
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
+
+                value: 3,
             },
 
             PieceInfo { // queen
@@ -48,6 +58,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: true,
+
+                value: 9,
             },
 
             PieceInfo { // king
@@ -55,6 +67,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
+
+                value: 0,
             },
 
 
@@ -64,6 +78,8 @@ pub mod constants {
                 moves_no: 1,
                 move_only: true,
                 sliding: false,
+
+                value: 1,
             },
 
             PieceInfo { // rook
@@ -71,6 +87,8 @@ pub mod constants {
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
+
+                value: 5,
             },
 
             PieceInfo { // knight
@@ -78,6 +96,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
+
+                value: 3,
             },
 
             PieceInfo { // bishop
@@ -85,6 +105,8 @@ pub mod constants {
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
+
+                value: 3,
             },
 
             PieceInfo { // queen
@@ -92,6 +114,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: true,
+
+                value: 9,
             },
 
             PieceInfo { // king
@@ -99,6 +123,8 @@ pub mod constants {
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
+
+                value: 0,
             },
         ]
     }

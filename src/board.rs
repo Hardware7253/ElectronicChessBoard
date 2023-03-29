@@ -1,9 +1,9 @@
 pub mod board_representation {
 
-    #[derive(PartialEq, Debug)]
+    #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct Points { 
-        white_points: u8,
-        black_points: u8,
+        pub white_points: i8,
+        pub black_points: i8,
     }
 
     // Indexes for bitboards
@@ -21,15 +21,16 @@ pub mod board_representation {
     // Black queen = 10
     // Black king = 11
 
-    // Last bitboard (index 12) is for moves
+    // Last bitboard (index 12) is for moves (0 for moved 0 times, 1 for moved > 0 times)
     
-    #[derive(PartialEq, Debug)]
+    #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct Board {
-        pub board: [u64; 13],
-        pub whites_move: bool,
-        pub points: Points,
+        pub board: [u64; 13], // Bitboards for every type of piece
+        pub whites_move: bool, 
+        pub points: Points, // White and black team points
+        pub points_delta: i8, // Change in points for team after the last move
         pub turns_since_capture: u8,
-        pub en_passant_target: Option<usize>,
+        pub en_passant_target: Option<usize>, // En passant target bit
     }
 
     // Coordinates used to reference a single piece on the board
@@ -61,12 +62,10 @@ pub mod board_representation {
                     white_points: 0,
                     black_points: 0,
                 },
+                points_delta: 0,
                 turns_since_capture: 0,
                 en_passant_target: None,
             }
-        }
-
-        fn setup() {
         }
     }
 
@@ -412,12 +411,12 @@ pub mod move_generator {
     }
 
     // Assumes the given piece is a king, and that the moves bitboard is accurate
-    fn castle(king: &board_representation::BoardCoordinates, king_move_bit: usize, team_bitboards: &crate::TeamBitboards, enemy_attack_bitboard: u64, board: &board_representation::Board) -> Result<Moves, ()> {
+    fn castle(king: &board_representation::BoardCoordinates, king_move_bit: usize, team_bitboards: &crate::TeamBitboards, enemy_attack_bitboard: u64, board: &board_representation::Board) -> Moves {
         use crate::bit_on;
 
         // If the king is in check, or has moved don't castle
         if bit_on(enemy_attack_bitboard, king.bit) || !bit_on(board.board[12], king.bit) {
-            return Err(());
+            Moves::new();
         }
 
         let all_pieces_bitboard = team_bitboards.friendly_team | team_bitboards.enemy_team;
@@ -451,26 +450,26 @@ pub mod move_generator {
 
                     // Check there is no piece next to the rook on the queen side
                     if i == 1 && bit_on(all_pieces_bitboard, usize::try_from(piece_bit as i8 + king_castle_moves[i]).unwrap()) {
-                        return Err(());
+                        Moves::new();
                     } else {
-                        return Ok(Moves {
+                        return Moves {
                             moves_bitboard: 0,
                             en_passant_target_bit: Some((rook_bit as i8 + rook_castle_moves[i]).try_into().unwrap()), // Use en passant target to show where a rook should be added on the board
-                            en_passant_capture_bit: Some(rook_bit), // Use en passant capture bit to show where a rook should be removed from the borad
-                        });
+                            en_passant_capture_bit: Some(rook_bit), // Use en passant capture bit to show where a rook should be removed from the board
+                        };
                     }
                     
                 }
             }
         }
 
-        Err(())
+        Moves::new()
     }
 
     #[derive(PartialEq, Debug)]
     pub struct EnemyAttacks {
         enemy_attack_bitboard: u64,
-        checking_pieces:  [Option<board_representation::BoardCoordinates>; 2],
+        checking_pieces: [Option<board_representation::BoardCoordinates>; 2],
         checking_pieces_no: usize,
     }
 
@@ -550,8 +549,6 @@ pub mod move_generator {
             }
         }
 
-        println!("{}", king_can_move);
-
         if !king_can_move {
 
             // If the king is in double check and the king can't move then it is mate
@@ -613,6 +610,124 @@ pub mod move_generator {
             }
         }
         false
+    }
+
+    // Move piece to piece_move_bit if the move is valid
+    // If move is valid update the board, else return an error
+    pub fn new_turn(piece: &board_representation::BoardCoordinates, piece_move_bit: usize, friendly_king: &board_representation::BoardCoordinates, enemy_attacks: &EnemyAttacks, team_bitboards: crate::TeamBitboards, mut board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Result<board_representation::Board, ()> {
+        
+        // If the move puts the piece outside of the board space return an error for an invalid move
+        if !crate::bit_move_valid(piece.bit, piece_move_bit as i8 - piece.bit as i8) {
+            return Err(());
+        }
+
+        // If the piece is a king generate castle moves
+        let mut piece_moves = Moves::new();
+        if piece.board_index == 5 || piece.board_index == 11 {
+            piece_moves = castle(piece, piece_move_bit, &team_bitboards, enemy_attacks.enemy_attack_bitboard, &board);
+        }
+
+        // Get piece team
+        let piece_white = crate::board_index_white(piece.board_index);
+
+        // If the castle was valid move the rook
+        // If the castle was not valid generate regular piece moves
+        let mut castled = false;
+        match piece_moves.en_passant_target_bit {
+            Some(rook_add_bit) => {
+                let rook_remove_bit = piece_moves.en_passant_capture_bit.unwrap();
+
+                // Get friendly rook board index
+                let friendly_rook_board_index;
+                if piece_white {
+                    friendly_rook_board_index = 1;
+                } else {
+                    friendly_rook_board_index = 7;
+                }
+
+                // Remove rook rook_remove_bit and add rook at rook_add_bit
+                board.board[friendly_rook_board_index] ^= 1 << rook_remove_bit | 1 << rook_add_bit;
+                castled = true;
+            },
+            None => piece_moves = gen_piece(piece, team_bitboards, false, &board, pieces_info), // Gen non castle moves
+        }
+        
+        // Return an error if the piece_move bit is not on in the piece_moves bitboard
+        if !crate::bit_on(piece_moves.moves_bitboard, piece_move_bit) {
+            return Err(());
+        }
+
+        if !castled {
+
+            // Remove en passant capture from the board
+            match piece_moves.en_passant_capture_bit {
+                Some(capture_bit) => {
+                    let en_passant_capture_xor_bitboard: u64 = 1 << capture_bit;
+                        
+                        // Get enemy pawn board index
+                        let enemy_pawn_board_index;
+                        if piece_white {
+                            enemy_pawn_board_index = 6;
+                        } else {
+                            enemy_pawn_board_index = 0;
+                        }
+                        
+                        board.board[enemy_pawn_board_index] ^= en_passant_capture_xor_bitboard; // Remove en passant capture piece from the board
+                },
+                None => (),
+            }
+
+            // Update board en passant target
+            board.en_passant_target = piece_moves.en_passant_target_bit;
+        }
+        
+        // Move piece on board to new coordinates (bit)
+        let piece_move_bitoard = 1 << piece_move_bit;
+        board.board[piece.board_index] ^= 1 << piece.bit | piece_move_bitoard;
+
+        // Update piece moves bitboard
+        board.board[12] |= piece_move_bitoard;
+
+        // Get enemy board indexes
+        let enemy_indexes;
+        if piece_white {
+            enemy_indexes = 6..12
+        } else {
+            enemy_indexes = 0..6
+        }
+
+        // If a piece was captured remove it on the appropriate enemy bitboard and store the captured pieces value
+        let mut value = 0;
+        for i in enemy_indexes {
+            let new_piece_bitboard = board.board[i] ^ piece_move_bitoard ;
+            if new_piece_bitboard < board.board[i] {
+                board.board[i] = new_piece_bitboard;
+                value = pieces_info[i].value;
+                break;
+            }
+        }
+        board.points_delta = value;
+
+        if value == 0 {
+            board.turns_since_capture += 1;
+        } else {
+            board.turns_since_capture = 0;
+        }
+
+        // If the king is in check after the move return an error
+        let enemy_attacks = gen_enemy_attacks(friendly_king, team_bitboards, &board, pieces_info);
+        if enemy_attacks.checking_pieces_no != 0 {
+            return Err(());
+        }
+
+        // Update points
+        if piece_white {
+            board.points.white_points += value;
+        } else {
+            board.points.black_points += value;
+        }
+
+        Ok(board)
     }
 
     // Returns a bitboard where a piece is moved from inital by delta bit
@@ -734,8 +849,8 @@ pub mod move_generator {
                 en_passant_capture_bit: Some(0),
             };
             
-            assert_eq!(castle(&piece, 2, &team_bitboards, 0, &board), Ok(expected)); // Valid castle
-            assert_eq!(castle(&piece, 2, &team_bitboards, 4, &board), Err(())); // Test an enemy attack blocking the path
+            assert_eq!(castle(&piece, 2, &team_bitboards, 0, &board), expected); // Valid castle
+            assert_eq!(castle(&piece, 2, &team_bitboards, 4, &board), Moves::new()); // Test an enemy attack blocking the path
         }
 
         #[test]
@@ -819,9 +934,9 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let enemey_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-            let result = is_mate(&king, &enemey_attacks, team_bitboards, &board, &pieces_info);
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
             
             assert_eq!(result, true);
         }
@@ -841,9 +956,9 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let enemey_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-            let result = is_mate(&king, &enemey_attacks, team_bitboards, &board, &pieces_info);
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
             
             assert_eq!(result, true);
         }
@@ -863,11 +978,43 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let enemey_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-            let result = is_mate(&king, &enemey_attacks, team_bitboards, &board, &pieces_info);
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
             
             assert_eq!(result, true);
+        }
+
+        #[test]
+        fn new_turn_test() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("8/8/8/1N3q2/8/3B4/8/K7 w - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 5,
+                bit: 56,
+            };
+
+            let piece = BoardCoordinates {
+                board_index: 3,
+                bit: 43,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let new_turn_board = new_turn(&piece, 29, &king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            let mut expected_board = fen_decode("8/8/8/1N3B2/8/8/8/K7 w - - 0 1", true);
+            expected_board.points.white_points = 9;
+            expected_board.points_delta = 9;
+            expected_board.board[12] |= 1 << 29;
+
+            assert_eq!(new_turn_board, Ok(expected_board));
         }
     }
 }
