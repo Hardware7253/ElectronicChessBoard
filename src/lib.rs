@@ -112,6 +112,7 @@ pub struct TeamBitboards {
 }
 
 impl TeamBitboards {
+    // Generate team bitborads relative to index team
     pub fn new(index: usize, board: &crate::board::board_representation::Board) -> Self {
         let all_white_bitboard = or_bitboards(0, 5, &board.board);
         let all_black_bitboard = or_bitboards(6, 11, &board.board);
