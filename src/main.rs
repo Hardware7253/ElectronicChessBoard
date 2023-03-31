@@ -7,10 +7,12 @@ fn main() {
     println!("{:?}", board);
     */
 
-    let board = chess2::board::board_representation::fen_decode("8/8/8/2PPP3/2P1P3/2PPP3/8/8 w - - 0 1", true).board[0];
+    let board = chess2::board::board_representation::fen_decode("K7/8/4P3/8/8/8/8/k7 w - - 0 1", true).board[0];
     println!("{:?}", board);
 
-    println!("{}", chess2::find_bit_on(35184372088832, 0));
+    println!("{}", chess2::find_bit_on(1099511660544, 0));
+
+    //[0, 1125899906842624, 0, 0, 0, 4, 0, 32769, 0, 0, 0, 128, 18446744073709551615]
 
     //[0, 2251799813685248, 0, 0, 0, 34359738368, 0, 8800387989504, 35184372088832, 0, 0, 128, 18446744073709551615]
 

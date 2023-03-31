@@ -55,7 +55,18 @@ fn update_min_max(piece_move: Move, mut min_max: MinMax) -> MinMax {
     min_max
 }
 
-pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
+fn update_prune_value(master_team: bool, min_max: &MinMax) -> Option<i8> {
+    if master_team {
+        match min_max.max_move {
+            Some(max_move) => return Some(max_move.value),
+            None => return None,
+        }
+    } else {
+        return min_max.min_value;
+    }
+}
+
+pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, parent_value: Option<i8>, board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
 
@@ -102,6 +113,8 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
         min_value: None,
     };
 
+    let mut prune_value: Option<i8> = None;
+
     for i in 0..moves.len() {
         let initial_piece_coordinates = moves[i].initial_piece_coordinates;
         let final_piece_bit = moves[i].final_piece_bit;
@@ -113,6 +126,11 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
             // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
             Ok(new_board) => {
                 let mut move_value = new_board.points_delta;
+
+                if new_board.board == [0, 1125899906842624, 0, 0, 0, 4, 0, 32769, 0, 0, 0, 128, 18446744073709551615] {
+                    //println!("true");
+                    //println!("{:?}", board.board);
+                }
                 
                 // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
                 if !master_team {
@@ -121,7 +139,7 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 
                 let branch_value = init_value + move_value;
 
-                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, new_board, pieces_info);
+                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, new_board, pieces_info);
                 let piece_move = Move {
                     initial_piece_coordinates: initial_piece_coordinates,
                     final_piece_bit: final_piece_bit,
@@ -129,6 +147,7 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
                 };
                 
                 min_max = update_min_max(piece_move, min_max);
+                prune_value = update_prune_value(master_team, &min_max);
             },
             Err(error) => {
 
@@ -156,15 +175,43 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
                     };
 
                     min_max = update_min_max(piece_move, min_max);
+                    prune_value = update_prune_value(master_team, &min_max);
                 }
 
                 continue;
             },
         }
+
+        // Alpha beta pruning
+        match parent_value {
+            Some(value) => {
+                if master_team {
+                    match min_max.max_move {
+                        Some(max_move) => {
+                            if max_move.value >= value {
+                                break;
+                            }
+                        },
+                        None => (),
+                    }
+                } else {
+                    match min_max.min_value {
+                        Some(min_value) => {
+                            if min_value <= value {
+                                break;
+                            }
+                        },
+                        None => (),
+                    }
+                }
+            },
+            None => ()
+        }
     }
 
     // Return min/max values depending on the team
     if master_team {
+        //println!("{:?}", board.board);
         return min_max.max_move.unwrap();
     } else {
         empty_move.value = min_max.min_value.unwrap();
@@ -342,7 +389,31 @@ mod tests {
     }
 
     #[test]
-    fn gen_best_move_test() {
+    fn update_prune_value_test() {
+        use crate::board::board_representation;
+        use crate::board::move_generator;
+
+        let piece_move = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 0,
+            },
+            final_piece_bit: 0,
+            value: 5,
+        };
+
+        let min_max = MinMax {
+            max_move: Some(piece_move),
+            min_value: Some(3),
+        };
+
+        let result = update_prune_value(true, &min_max);
+
+        assert_eq!(result, Some(5));
+    }
+
+    #[test]
+    fn gen_best_move_test1() {
         use crate::board::board_representation;
         use crate::board::move_generator;
 
@@ -352,7 +423,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -361,6 +432,31 @@ mod tests {
             },
             final_piece_bit: 55,
             value: 3,
+        };
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn gen_best_move_test2() { // Test a capture with en passant being the best move
+        use crate::board::board_representation;
+        use crate::board::move_generator;
+
+        let board = board_representation::fen_decode("K7/8/8/4pP2/8/8/8/k7 w - e6 0 1", true);
+
+        let team_bitboards = TeamBitboards::new(0, &board);
+
+        let pieces_info = crate::piece::constants::gen();
+        
+        let result = gen_best_move(true, 3, 0, 0, None, board, &pieces_info);
+
+        let expected = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 29,
+            },
+            final_piece_bit: 20,
+            value: 1,
         };
 
         assert_eq!(result, expected);
