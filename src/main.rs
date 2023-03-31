@@ -7,7 +7,7 @@ fn main() {
     println!("{:?}", board);
     */
 
-    let board = chess2::board::board_representation::fen_decode("K7/8/4P3/8/8/8/8/k7 w - - 0 1", true).board[0];
+    let board = chess2::board::board_representation::fen_decode("1PP5/P7/P7/P7/P7/P7/P7/8 w - - 0 1", true).board[0];
     println!("{:?}", board);
 
     println!("{}", chess2::find_bit_on(1099511660544, 0));

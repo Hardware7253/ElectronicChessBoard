@@ -606,6 +606,13 @@ pub mod move_generator {
                 friendly_indexes = 6..11
             }
 
+            let enemy_team_bitboards = crate::TeamBitboards {
+                friendly_team: team_bitboards.enemy_team,
+                enemy_team: team_bitboards.friendly_team,
+            };
+
+            let checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info);
+
             let mut friendly_moves: u64 = 0;
             for i in friendly_indexes {
                 for j in 0..64 {
@@ -621,11 +628,24 @@ pub mod move_generator {
 
                     let piece_moves = gen_piece(&board_coordinates, team_bitboards, false, board, pieces_info);
                     
-                    // If the piece that is putting the king in check can be captured then it is not mate
+                    // If the piece that is putting the king in check can be captured or blocked then it is not mate
                     if use_checking_piece {
-                        if bit_on(piece_moves.moves_bitboard, checking_piece.bit) {
-                            return false;
+                        for l in 0..64 {
+                            if bit_on(piece_moves.moves_bitboard, l) && bit_on(checking_piece_moves.moves_bitboard, l) {
+
+                                let enemy_team_bitboards = crate::TeamBitboards {
+                                    friendly_team: team_bitboards.enemy_team,
+                                    enemy_team: team_bitboards.friendly_team ^ (1 << j | 1 << l),
+                                };
+
+                                let checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info);
+
+                                if !bit_on(checking_piece_moves.moves_bitboard, king.bit) {
+                                    return false;
+                                }
+                            }
                         }
+                        
                     } else { // If there is no piece putting the king in check at piece moves to friendly moves bitboard
                         friendly_moves |= piece_moves.moves_bitboard;
                     }
