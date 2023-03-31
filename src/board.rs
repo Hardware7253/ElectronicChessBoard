@@ -71,7 +71,6 @@ pub mod board_representation {
 
     pub fn fen_decode(fen: &str, master: bool) -> Board {
         let fen_vec: Vec<char> = fen.chars().collect();
-        let init_board: u64 = 0;
 
         let mut spaces = 0;
         let mut ccn = String::new();
@@ -351,8 +350,6 @@ pub mod move_generator {
     fn gen_pawn_captures(piece: &board_representation::BoardCoordinates, force_attacks: bool, mut team_bitboards: crate::TeamBitboards, board: &board_representation::Board) -> Moves {
         use crate::bit_on;
 
-        let initial_piece_bitboard: u64 = 1 << piece.bit; // Stores a bitboard where the piece is isolated
-
         let mut moves_bitboard = 0; // Stores the capture moves for the pawns
 
         // Add an imaginary piece at the en passant target so a friendly pawn can capture it
@@ -379,7 +376,6 @@ pub mod move_generator {
             let move_delta_bit = capture_moves[i];
             let piece_move_bit_i8 = piece_bit_i8 + move_delta_bit;
             let piece_move_bit = usize::try_from(piece_move_bit_i8).unwrap();
-            //println!("{}", en_passant_target_bit);
 
             if bit_on(team_bitboards.enemy_team, piece_move_bit) || force_attacks { // Only try to move if an enemy occupies the square that will be moved to or force attacks is true
                 match move_piece(piece.bit, move_delta_bit) {
@@ -416,7 +412,7 @@ pub mod move_generator {
 
         // If the king is in check, or has moved don't castle
         if bit_on(enemy_attack_bitboard, king.bit) || !bit_on(board.board[12], king.bit) {
-            Moves::new();
+            return Moves::new();
         }
 
         let all_pieces_bitboard = team_bitboards.friendly_team | team_bitboards.enemy_team;
@@ -424,8 +420,6 @@ pub mod move_generator {
         let king_castle_moves: [i8; 2] =         [1, -1];
         let rook_relative_coordinates: [i8; 2] = [3, -4];
         let rook_castle_moves: [i8; 2] =         [-2, 3];
-        
-        let mut king_moves_bitboard: u64 = 0;
         
         for i in 0..king_castle_moves.len() {
             let mut piece_bit = king.bit;
@@ -450,10 +444,10 @@ pub mod move_generator {
 
                     // Check there is no piece next to the rook on the queen side
                     if i == 1 && bit_on(all_pieces_bitboard, usize::try_from(piece_bit as i8 + king_castle_moves[i]).unwrap()) {
-                        Moves::new();
+                        return Moves::new();
                     } else {
                         return Moves {
-                            moves_bitboard: 0,
+                            moves_bitboard: 1 << king_move_bit,
                             en_passant_target_bit: Some((rook_bit as i8 + rook_castle_moves[i]).try_into().unwrap()), // Use en passant target to show where a rook should be added on the board
                             en_passant_capture_bit: Some(rook_bit), // Use en passant capture bit to show where a rook should be removed from the board
                         };
@@ -468,13 +462,13 @@ pub mod move_generator {
 
     #[derive(PartialEq, Debug)]
     pub struct EnemyAttacks {
-        enemy_attack_bitboard: u64,
+        pub enemy_attack_bitboard: u64,
         checking_pieces: [Option<board_representation::BoardCoordinates>; 2],
         checking_pieces_no: usize,
     }
 
     // Generates atacks of enemys to the kings team, stores enemy pieces that put the king in check
-    fn gen_enemy_attacks(king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> EnemyAttacks {
+    pub fn gen_enemy_attacks(king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> EnemyAttacks {
         use board_representation::BoardCoordinates;
         use crate::bit_on;
 
@@ -696,13 +690,10 @@ pub mod move_generator {
 
         // Get enemy board indexes
         let enemy_indexes;
-        let enemy_index;
         if piece_white {
             enemy_indexes = 6..12;
-            enemy_index = 6;
         } else {
             enemy_indexes = 0..6;
-            enemy_index = 0;
         }
 
         // If a piece was captured remove it on the appropriate enemy bitboard and store the captured pieces value
@@ -779,7 +770,6 @@ pub mod move_generator {
     mod tests {
         use board_representation::BoardCoordinates;
         use board_representation::fen_decode;
-        use crate::TeamBitboards;
         use super::*;
         
         #[test]
@@ -870,7 +860,7 @@ pub mod move_generator {
             let team_bitboards = TeamBitboards::new(piece.board_index, &board);
 
             let expected = Moves {
-                moves_bitboard: 0,
+                moves_bitboard: 1 << 2,
                 en_passant_target_bit: Some(3),
                 en_passant_capture_bit: Some(0),
             };
