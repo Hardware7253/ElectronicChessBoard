@@ -1,19 +1,181 @@
 use crate::board::board_representation;
 use crate::board::move_generator::EnemyAttacks;
-
-//pub fn gen_best_move(team_white: bool, board: board_representation::Board)
+use crate::TeamBitboards;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-struct Move {
-    initial_piece_coordinates: board_representation::BoardCoordinates,
-    final_piece_bit: usize,
-    value: i8,
+pub struct Move {
+    pub initial_piece_coordinates: board_representation::BoardCoordinates,
+    pub final_piece_bit: usize,
+    pub value: i8,
+}
+
+impl Move {
+    fn new() -> Self {
+        Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 0,
+            },
+            final_piece_bit: 0,
+            value: 0,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+struct MinMax {
+    max_move: Option<Move>,
+    min_value: Option<i8>,
+}
+
+// Update MinMax struct if new move has a value lesser or greater than min/max fields
+// Initialize MinMax if it hasn't been allready
+fn update_min_max(piece_move: Move, mut min_max: MinMax) -> MinMax {
+    match min_max.max_move {
+        Some(_) => (),
+        None => {
+
+            // If min_max has not yet been initialized then initialize it with piece_move
+            return MinMax {
+                max_move: Some(piece_move),
+                min_value: Some(piece_move.value),
+            };
+        },
+    }
+
+    let max_value = min_max.max_move.unwrap().value;
+    let min_value = min_max.min_value.unwrap();
+
+    if piece_move.value > max_value {
+        min_max.max_move = Some(piece_move);
+    } else if piece_move.value < min_value {
+        min_max.min_value = Some(piece_move.value);
+    }
+
+    min_max
+}
+
+pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
+    use crate::board::move_generator;
+    use crate::board::move_generator::TurnError;
+
+    let mut empty_move = Move::new();
+
+    // If current depth and search depth are equal stop searching down the move tree
+    if current_depth == search_depth {
+        empty_move.value = init_value;
+        return empty_move;
+    }
+
+    // Get friendly and enemy team BoardCoordinates
+    let friendly_king_index;
+    let enemy_king_index;
+    if board.whites_move {
+        friendly_king_index = 5;
+        enemy_king_index = 11;
+    } else {
+        friendly_king_index = 11;
+        enemy_king_index = 5;
+    }
+
+    let friendly_king = board_representation::BoardCoordinates {
+        board_index: friendly_king_index,
+        bit: crate::find_bit_on(board.board[friendly_king_index], 0),
+    };
+
+    let enemy_king = board_representation::BoardCoordinates {
+        board_index: enemy_king_index,
+        bit: crate::find_bit_on(board.board[enemy_king_index], 0),
+    };
+    
+    // Generate team bitboards
+    let team_bitboards = TeamBitboards::new(friendly_king_index, &board);
+
+    // Generate enemy attacks
+    let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, pieces_info);
+
+    // Generate moves
+    let moves = &order_moves(true, &board, &enemy_attacks, &friendly_king, team_bitboards, pieces_info);
+
+    let mut min_max = MinMax {
+        max_move: None,
+        min_value: None,
+    };
+
+    for i in 0..moves.len() {
+        let initial_piece_coordinates = moves[i].initial_piece_coordinates;
+        let final_piece_bit = moves[i].final_piece_bit;
+
+        let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+        
+        match new_turn_board {
+
+            // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
+            Ok(new_board) => {
+                let mut move_value = new_board.points_delta;
+                
+                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                if !master_team {
+                    move_value *= -1;
+                }
+
+                let branch_value = init_value + move_value;
+
+                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, new_board, pieces_info);
+                let piece_move = Move {
+                    initial_piece_coordinates: initial_piece_coordinates,
+                    final_piece_bit: final_piece_bit,
+                    value: piece_move.value,
+                };
+                
+                min_max = update_min_max(piece_move, min_max);
+            },
+            Err(error) => {
+
+                // Update min_max with value of game ending if the game ended
+                let mut branch_value;
+                let valid_move;
+
+                match error {
+                    TurnError::Win => {branch_value = 127; valid_move = true},
+                    TurnError::Draw => {branch_value = 0; valid_move = true},
+                    TurnError::InvalidMove => {branch_value = 0; valid_move = false},
+                    TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
+                }
+
+                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                if !master_team {
+                    branch_value *= -1;
+                }
+
+                if valid_move {
+                    let piece_move = Move {
+                        initial_piece_coordinates: initial_piece_coordinates,
+                        final_piece_bit: final_piece_bit,
+                        value: branch_value,
+                    };
+
+                    min_max = update_min_max(piece_move, min_max);
+                }
+
+                continue;
+            },
+        }
+    }
+
+    // Return min/max values depending on the team
+    if master_team {
+        return min_max.max_move.unwrap();
+    } else {
+        empty_move.value = min_max.min_value.unwrap();
+        return empty_move;
+    }
 }
 
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(team_white: bool, sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
     use crate::bit_on;
     
     let mut moves: Vec<Move> = Vec::new();
@@ -22,7 +184,7 @@ fn order_moves(team_white: bool, sort: bool, board: &board_representation::Board
     let friendly_indexes;
     let enemy_index_bottom; // Inclusive
     let enemy_index_top; // Not inclusive
-    if team_white {
+    if board.whites_move {
         friendly_indexes = 0..6;
         enemy_index_bottom = 6;
         enemy_index_top = 12;
@@ -105,39 +267,102 @@ mod tests {
 
     #[test]
     fn order_moves_test() {
-        use crate::TeamBitboards;
         use crate::board::board_representation;
         use crate::board::move_generator;
 
-            let board = board_representation::fen_decode("k7/8/8/8/4r3/3P4/8/7K w - - 0 1", true);
+        let board = board_representation::fen_decode("k7/8/8/8/4r3/3P4/8/7K w - - 0 1", true);
 
-            let king = board_representation::BoardCoordinates {
-                board_index: 5,
-                bit: 63,
-            };
+        let king = board_representation::BoardCoordinates {
+            board_index: 5,
+            bit: 63,
+        };
 
-            let enemy_king = board_representation::BoardCoordinates {
-                board_index: 11,
+        let enemy_king = board_representation::BoardCoordinates {
+            board_index: 11,
+            bit: 0,
+        };
+
+        let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+        let pieces_info = crate::piece::constants::gen();
+
+        let enemy_attacks = move_generator::gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+        let result = order_moves(true, &board, &enemy_attacks, &king, team_bitboards, &pieces_info);
+
+        let best_move = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 43,
+            },
+            final_piece_bit: 36,
+            value: 5,
+        };
+
+        assert_eq!(result[0], best_move);
+    }
+
+    #[test]
+    fn update_min_max_test() {
+        use crate::board::board_representation;
+        use crate::board::move_generator;
+
+        let max_move = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 43,
+            },
+            final_piece_bit: 36,
+            value: 3,
+        };
+
+        let piece_move = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
                 bit: 0,
-            };
+            },
+            final_piece_bit: 0,
+            value: 5,
+        };
 
-            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+        let min_max = MinMax {
+            max_move: None,
+            min_value: None,
+        };
 
-            let pieces_info = crate::piece::constants::gen();
+        let min_max = update_min_max(max_move, min_max);
+        let min_max = update_min_max(piece_move, min_max);
 
-            let enemy_attacks = move_generator::gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+        let expected = MinMax {
+            max_move: Some(piece_move),
+            min_value: Some(3),
+        };
 
-            let result = order_moves(true, true, &board, &enemy_attacks, &king, team_bitboards, &pieces_info);
+        assert_eq!(min_max, expected);
+    }
 
-            let best_move = Move {
-                initial_piece_coordinates: board_representation::BoardCoordinates {
-                    board_index: 0,
-                    bit: 43,
-                },
-                final_piece_bit: 36,
-                value: 5,
-            };
+    #[test]
+    fn gen_best_move_test() {
+        use crate::board::board_representation;
+        use crate::board::move_generator;
 
-            assert_eq!(result[0], best_move);
+        let board = board_representation::fen_decode("7k/2K5/8/8/8/r2r4/3R3n/8 w - - 0 1", true);
+
+        let team_bitboards = TeamBitboards::new(0, &board);
+
+        let pieces_info = crate::piece::constants::gen();
+        
+        let result = gen_best_move(true, 3, 0, 0, board, &pieces_info);
+
+        let expected = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 1,
+                bit: 51,
+            },
+            final_piece_bit: 55,
+            value: 3,
+        };
+
+        assert_eq!(result, expected);
     }
 }
