@@ -69,6 +69,7 @@ pub mod board_representation {
         }
     }
 
+    // Decodes a fen string into engine board format
     pub fn fen_decode(fen: &str, master: bool) -> Board {
         let fen_vec: Vec<char> = fen.chars().collect();
 
@@ -152,7 +153,7 @@ pub mod board_representation {
             // Set en passant conditions
             if spaces == 3 && fen_char != ' '{
                 ccn.push(fen_char);
-                match crate::ccn_to_i(&ccn) {
+                match crate::ccn_to_bit(&ccn) {
                     Ok(bit) =>  board.en_passant_target = Some(bit),
                     Err(()) => (),
                 }
@@ -191,6 +192,60 @@ pub mod board_representation {
         Err(())
     }
 
+    // Takes a board and encodes it into a fen string
+    // Castling conditions, en passant target, etc is not added to the resuling fen string
+    pub fn fen_encode(board: &Board) -> String {
+        let char_ids = ['P', 'R', 'N', 'B', 'Q', 'K', 'p', 'r', 'n', 'b', 'q', 'k'];
+        let mut char_board = ['0'; 64];
+
+        let mut fen_string = String::new();
+
+        // Add all char ids to a board array
+        for i in 0..char_ids.len() {
+            for j in 0..char_board.len() {
+                if crate::bit_on(board.board[i], j) {
+                    char_board[j] = char_ids[i];
+                }
+            }
+        }
+
+        // Turn board array into fen
+        let mut empty_square_count = 0;
+        for i in 0..char_board.len() {
+            let current_char = char_board[i];
+
+            let row_end = (i as isize - 7) % 8 == 0;
+
+            if current_char == '0' {
+                empty_square_count += 1; // Increment empty squares
+            } else {
+                
+                // If there are empty squares before the piece add them to the fen string
+                if empty_square_count > 0 {
+                    fen_string.push_str(&crate::num_to_char(empty_square_count).unwrap().to_string());
+                    empty_square_count = 0;
+                }
+                fen_string.push_str(&current_char.to_string());
+            }
+
+            // Add a / to seperate rows once the end of the row is reached
+            if row_end {
+
+                // Add empty square count if necassary
+                if empty_square_count > 0 {
+                    fen_string.push_str(&crate::num_to_char(empty_square_count).unwrap().to_string());
+                }
+
+                if i != char_board.len() - 1 { // Don't add / on the end of the fen string
+                    fen_string.push_str(&'/'.to_string());
+                    empty_square_count = 0;
+                }
+            }
+        }
+
+        fen_string
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -225,7 +280,17 @@ pub mod board_representation {
 
 
             assert_eq!(board, expected);
+        }
 
+        // Reliant on fen_decode working
+        #[test]
+        fn fen_encode_test() {
+            let board = fen_decode("rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 0 1", true);
+
+            let result = fen_encode(&board);
+            let expected = String::from("rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR");
+
+            assert_eq!(result, expected);
         }
     }
 }

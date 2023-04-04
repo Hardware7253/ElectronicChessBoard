@@ -13,8 +13,17 @@ pub fn char_to_num(c: char, offset: i8) -> Result<i8, ()> {
     Ok(num)
 }
 
-// Chess coordinate notation to bitboard bit index
-pub fn ccn_to_i(ccn: &str) -> Result<usize, ()> {
+pub fn num_to_char(num: usize) -> Result<char, ()> {
+    if num > 9 {
+        return Err(());
+    }
+    let num = u8::try_from(num).unwrap();
+    let char_num = (num + 48) as char;
+    Ok(char_num)
+}
+
+// Chess coordinate notation to bitboard bit
+pub fn ccn_to_bit(ccn: &str) -> Result<usize, ()> {
     let ccn_vec: Vec<char> = ccn.chars().collect();
     if ccn_vec.len() < 2 {
         return Err(());
@@ -40,6 +49,20 @@ pub fn ccn_to_i(ccn: &str) -> Result<usize, ()> {
     let i = {{y - 8}.abs() * 8} + x - 1;
 
     Ok(i.try_into().unwrap())
+}
+
+pub fn bit_to_ccn(bit: usize) -> &'static str {
+    let ccn_array: [&str; 64] = [
+        "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+        "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+        "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+        "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+        "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+        "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+        "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+    ];
+    ccn_array[bit]
 }
 
 // Converts a bit number (e.g. bit 7 in a u64) to a cartesian coordinates on the board
@@ -105,6 +128,12 @@ pub fn find_bit_on(num: u64, default: usize) -> usize {
     default
 }
 
+// Flips bitboard bit to enemy team perspective
+pub fn flip_bitboard_bit(bit: usize) -> usize {
+    let flipped = bit as i8 - 63;
+    flipped.abs().try_into().unwrap()
+}
+
 // A struct containing bitboards which have the locations of all pieces on the friendly and enemy team
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct TeamBitboards {
@@ -145,9 +174,19 @@ impl TeamBitboards {
         }
 
         #[test]
-        fn ccn_to_i_test() {
-            assert_eq!(ccn_to_i("a1"), Ok(56));
-            assert_eq!(ccn_to_i("a9"), Err(()));
+        fn num_to_char_test() {
+            assert_eq!(num_to_char(8), Ok('8'));
+        }
+
+        #[test]
+        fn ccn_to_bit_test() {
+            assert_eq!(ccn_to_bit("a1"), Ok(56));
+            assert_eq!(ccn_to_bit("a9"), Err(()));
+        }
+        
+        #[test]
+        fn bit_to_ccn_test() {
+            assert_eq!(bit_to_ccn(28), "e5");
         }
 
         #[test]
@@ -180,6 +219,11 @@ impl TeamBitboards {
         #[test]
         fn find_bit_on_test() {
             assert_eq!(find_bit_on(8, 0), 3);
+        }
+
+        #[test]
+        fn flip_bitboard_bit_test() {
+            assert_eq!(flip_bitboard_bit(49), 14);
         }
 
         #[test]

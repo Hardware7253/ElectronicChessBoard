@@ -182,6 +182,10 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
             },
         }
 
+        if board.board == [64739244660228096, 9295429630892703744, 144115222435594240, 2594073385365405696, 576460752303423488, 1152921504606846976, 61184, 129, 35184372088896, 67108868, 4096, 16, 9086293723196625022] {
+            println!("{:?}", new_turn_board);
+        }
+
         // Alpha beta pruning
         match parent_value {
             Some(value) => {
@@ -211,6 +215,7 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 
     // Return min/max values depending on the team
     if master_team {
+        //println!("{}", board.whites_move);
         //println!("{:?}", board.board);
         return min_max.max_move.unwrap();
     } else {
@@ -449,6 +454,31 @@ mod tests {
         let pieces_info = crate::piece::constants::gen();
         
         let result = gen_best_move(true, 3, 0, 0, None, board, &pieces_info);
+
+        let expected = Move {
+            initial_piece_coordinates: board_representation::BoardCoordinates {
+                board_index: 0,
+                bit: 29,
+            },
+            final_piece_bit: 20,
+            value: 1,
+        };
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn gen_best_move_test3() { // Test a capture with en passant being the best move
+        use crate::board::board_representation;
+        use crate::board::move_generator;
+
+        let board = board_representation::fen_decode("r1bqk1nr/pppp1ppp/2n5/2b5/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 0 1", true);
+
+        let team_bitboards = TeamBitboards::new(0, &board);
+
+        let pieces_info = crate::piece::constants::gen();
+        
+        let result = gen_best_move(true, 7, 0, 0, None, board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {

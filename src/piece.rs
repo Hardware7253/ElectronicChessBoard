@@ -11,14 +11,14 @@ pub mod constants {
 
     pub fn gen() -> [PieceInfo; 12] {
         // How much the piece index changes when a move is made in a direction
-        let knight_moves = [-17, -15, -6, 10, 17, 15, 6, -10];
-        let straight_moves = [-8, 1, 8, -1, 0, 0, 0, 0];
-        let diagonal_moves = [-9, -7, 9, 7, 0, 0, 0, 0];
+        const KNIGHT_MOVES: [i8; 8] = [-17, -15, -6, 10, 17, 15, 6, -10];
+        const STRAIGHT_MOVES: [i8; 8] = [-8, 1, 8, -1, 0, 0, 0, 0];
+        const DIAGONAL_MOVES: [i8; 8] = [-9, -7, 9, 7, 0, 0, 0, 0];
 
         [   
             // White team
             PieceInfo { // pawn
-                moves: [straight_moves[0], 0, 0, 0, 0, 0, 0, 0],
+                moves: [STRAIGHT_MOVES[0], 0, 0, 0, 0, 0, 0, 0],
                 moves_no: 1,
                 move_only: true,
                 sliding: false,
@@ -27,7 +27,7 @@ pub mod constants {
             },
 
             PieceInfo { // rook
-                moves: straight_moves,
+                moves: STRAIGHT_MOVES,
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
@@ -36,7 +36,7 @@ pub mod constants {
             },
 
             PieceInfo { // knight
-                moves: knight_moves,
+                moves: KNIGHT_MOVES,
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
@@ -45,7 +45,7 @@ pub mod constants {
             },
 
             PieceInfo { // bishop
-                moves: diagonal_moves,
+                moves: DIAGONAL_MOVES,
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
@@ -54,7 +54,7 @@ pub mod constants {
             },
 
             PieceInfo { // queen
-                moves: [straight_moves[0], straight_moves[1], straight_moves[2], straight_moves[3], diagonal_moves[0], diagonal_moves[1], diagonal_moves[2], diagonal_moves[3]],
+                moves: [STRAIGHT_MOVES[0], STRAIGHT_MOVES[1], STRAIGHT_MOVES[2], STRAIGHT_MOVES[3], DIAGONAL_MOVES[0], DIAGONAL_MOVES[1], DIAGONAL_MOVES[2], DIAGONAL_MOVES[3]],
                 moves_no: 8,
                 move_only: false,
                 sliding: true,
@@ -63,7 +63,7 @@ pub mod constants {
             },
 
             PieceInfo { // king
-                moves: [straight_moves[0], straight_moves[1], straight_moves[2], straight_moves[3], diagonal_moves[0], diagonal_moves[1], diagonal_moves[2], diagonal_moves[3]],
+                moves: [STRAIGHT_MOVES[0], STRAIGHT_MOVES[1], STRAIGHT_MOVES[2], STRAIGHT_MOVES[3], DIAGONAL_MOVES[0], DIAGONAL_MOVES[1], DIAGONAL_MOVES[2], DIAGONAL_MOVES[3]],
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
@@ -74,7 +74,7 @@ pub mod constants {
 
             // Black team
             PieceInfo { // pawn
-                moves: [straight_moves[3], 0, 0, 0, 0, 0, 0, 0],
+                moves: [STRAIGHT_MOVES[3], 0, 0, 0, 0, 0, 0, 0],
                 moves_no: 1,
                 move_only: true,
                 sliding: false,
@@ -83,7 +83,7 @@ pub mod constants {
             },
 
             PieceInfo { // rook
-                moves: straight_moves,
+                moves: STRAIGHT_MOVES,
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
@@ -92,7 +92,7 @@ pub mod constants {
             },
 
             PieceInfo { // knight
-                moves: knight_moves,
+                moves: KNIGHT_MOVES,
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
@@ -101,7 +101,7 @@ pub mod constants {
             },
 
             PieceInfo { // bishop
-                moves: diagonal_moves,
+                moves: DIAGONAL_MOVES,
                 moves_no: 4,
                 move_only: false,
                 sliding: true,
@@ -110,7 +110,7 @@ pub mod constants {
             },
 
             PieceInfo { // queen
-                moves: [straight_moves[0], straight_moves[1], straight_moves[2], straight_moves[3], diagonal_moves[0], diagonal_moves[1], diagonal_moves[2], diagonal_moves[3]],
+                moves: [STRAIGHT_MOVES[0], STRAIGHT_MOVES[1], STRAIGHT_MOVES[2], STRAIGHT_MOVES[3], DIAGONAL_MOVES[0], DIAGONAL_MOVES[1], DIAGONAL_MOVES[2], DIAGONAL_MOVES[3]],
                 moves_no: 8,
                 move_only: false,
                 sliding: true,
@@ -119,7 +119,7 @@ pub mod constants {
             },
 
             PieceInfo { // king
-                moves: [straight_moves[0], straight_moves[1], straight_moves[2], straight_moves[3], diagonal_moves[0], diagonal_moves[1], diagonal_moves[2], diagonal_moves[3]],
+                moves: [STRAIGHT_MOVES[0], STRAIGHT_MOVES[1], STRAIGHT_MOVES[2], STRAIGHT_MOVES[3], DIAGONAL_MOVES[0], DIAGONAL_MOVES[1], DIAGONAL_MOVES[2], DIAGONAL_MOVES[3]],
                 moves_no: 8,
                 move_only: false,
                 sliding: false,
