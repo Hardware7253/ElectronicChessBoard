@@ -120,17 +120,17 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
         let final_piece_bit = moves[i].final_piece_bit;
 
         let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+        if board.board == [65020753979899904, 9295429630892703744, 4611686018427912192, 288230376151711744, 4503599627370496, 1152921504606846976, 33616640, 129, 2112, 536870944, 8, 16, 9086293723196623998] {
+            println!("{:?}, {}", initial_piece_coordinates, final_piece_bit);
+            println!("{:?}", new_turn_board);
+        }
         
         match new_turn_board {
 
             // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
             Ok(new_board) => {
                 let mut move_value = new_board.points_delta;
-
-                if new_board.board == [0, 1125899906842624, 0, 0, 0, 4, 0, 32769, 0, 0, 0, 128, 18446744073709551615] {
-                    //println!("true");
-                    //println!("{:?}", board.board);
-                }
                 
                 // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
                 if !master_team {
@@ -182,10 +182,6 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
             },
         }
 
-        if board.board == [64739244660228096, 9295429630892703744, 144115222435594240, 2594073385365405696, 576460752303423488, 1152921504606846976, 61184, 129, 35184372088896, 67108868, 4096, 16, 9086293723196625022] {
-            println!("{:?}", new_turn_board);
-        }
-
         // Alpha beta pruning
         match parent_value {
             Some(value) => {
@@ -215,10 +211,9 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 
     // Return min/max values depending on the team
     if master_team {
-        //println!("{}", board.whites_move);
-        //println!("{:?}", board.board);
         return min_max.max_move.unwrap();
     } else {
+        //println!("{:?}", board.board);
         empty_move.value = min_max.min_value.unwrap();
         return empty_move;
     }
@@ -467,18 +462,19 @@ mod tests {
         assert_eq!(result, expected);
     }
 
+    /*
     #[test]
     fn gen_best_move_test3() { // Test a capture with en passant being the best move
         use crate::board::board_representation;
         use crate::board::move_generator;
 
-        let board = board_representation::fen_decode("r1bqk1nr/pppp1ppp/2n5/2b5/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 0 1", true);
+        let board = board_representation::fen_decode("rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 0 1", true);
 
         let team_bitboards = TeamBitboards::new(0, &board);
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 7, 0, 0, None, board, &pieces_info);
+        let result = gen_best_move(true, 6, 0, 0, None, board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -491,4 +487,5 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+    */
 }

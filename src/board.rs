@@ -642,6 +642,8 @@ pub mod move_generator {
             }
         }
 
+        println!("{}", king_can_move);
+
         if !king_can_move {
 
             // If the king is in double check and the king can't move then it is mate
@@ -649,38 +651,42 @@ pub mod move_generator {
                 return true;
             }
 
+            let mut enemy_team_bitboards = crate::TeamBitboards {
+                friendly_team: team_bitboards.enemy_team,
+                enemy_team: team_bitboards.friendly_team,
+            };
+
             let checking_piece;
             let use_checking_piece;
+            let checking_piece_moves;
             if enemy_attacks.checking_pieces_no == 1 {
                 checking_piece = enemy_attacks.checking_pieces[0].unwrap();
                 use_checking_piece = true;
+                checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info).moves_bitboard;
             } else {
                 checking_piece = BoardCoordinates {
                     board_index: 0,
                     bit: 0,
                 };
                 use_checking_piece = false;
+                checking_piece_moves = 0;
             }
 
             // Get friendly board indexes
             // Don't include kings
             let friendly_indexes;
+            let friendly_queen;
             if crate::board_index_white(king.board_index) {
-                friendly_indexes = 0..5
+                friendly_indexes = 0..5;
+                friendly_queen = 4;
             } else {
-                friendly_indexes = 6..11
+                friendly_indexes = 6..11;
+                friendly_queen = 10;
             }
-
-            let enemy_team_bitboards = crate::TeamBitboards {
-                friendly_team: team_bitboards.enemy_team,
-                enemy_team: team_bitboards.friendly_team,
-            };
-
-            let checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info);
 
             let mut friendly_moves: u64 = 0;
             for i in friendly_indexes {
-                for j in 0..64 {
+                for j in 0..64 { // Friendly piece initial bit
                     let board_coordinates = BoardCoordinates {
                         board_index: i,
                         bit: j,
@@ -693,27 +699,45 @@ pub mod move_generator {
 
                     let piece_moves = gen_piece(&board_coordinates, team_bitboards, false, board, pieces_info);
                     
-                    // If the piece that is putting the king in check can be captured or blocked then it is not mate
                     if use_checking_piece {
-                        for l in 0..64 {
-                            if bit_on(piece_moves.moves_bitboard, l) && bit_on(checking_piece_moves.moves_bitboard, l) {
+                        for l in 0..64 { // Friendly piece final bit
 
-                                let enemy_team_bitboards = crate::TeamBitboards {
-                                    friendly_team: team_bitboards.enemy_team,
-                                    enemy_team: team_bitboards.friendly_team ^ (1 << j | 1 << l),
-                                };
+                            // If the piece that is putting the king in check can be blocked or captured then it is not mate
+                            if bit_on(piece_moves.moves_bitboard, l) && bit_on(checking_piece_moves, l) || bit_on(piece_moves.moves_bitboard, checking_piece.bit) {
+                                enemy_team_bitboards.enemy_team ^= 1 << j | 1 << l; // Piece on bitboard to new coordinates
+                                enemy_team_bitboards.friendly_team ^= 1 << l; // Capture piece
+                                
+                                let checking_piece_moves;
+                                if l == checking_piece.bit {
+                                    checking_piece_moves = 0;
+                                } else {
+                                    checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info).moves_bitboard;
+                                }
+                            
+                                // If the king isn't in check after the move then there is no mate
+                                if !bit_on(checking_piece_moves, king.bit) {
+                                    let team_bitboards = crate::TeamBitboards {
+                                        friendly_team: enemy_team_bitboards.enemy_team,
+                                        enemy_team: enemy_team_bitboards.friendly_team,
+                                    };
 
-                                let checking_piece_moves = gen_piece(&checking_piece, enemy_team_bitboards, false, board, pieces_info);
+                                    let sliding_king = BoardCoordinates {
+                                        board_index: friendly_queen,
+                                        bit: king.bit,
+                                    };
 
-                                if !bit_on(checking_piece_moves.moves_bitboard, king.bit) {
+                                    let king_check_squares = gen_piece(&sliding_king, team_bitboards, false, board, pieces_info).moves_bitboard;
+                                    if bit_on(king_check_squares, 52) {
+                                        println!("{}", true);
+                                    }
                                     return false;
                                 }
                             }
                         }
-                        
-                    } else { // If there is no piece putting the king in check at piece moves to friendly moves bitboard
+                    } else {
                         friendly_moves |= piece_moves.moves_bitboard;
                     }
+                    
                 }
             }
 
@@ -857,6 +881,7 @@ pub mod move_generator {
             board.turns_since_capture += 1;
         } else {
             board.turns_since_capture = 0;
+            team_bitboards.enemy_team ^ 1 << piece_move_bit; // Remove captured piece from enemy team bitboard
         }
 
         // If the king is in check after the move return an error
@@ -867,8 +892,8 @@ pub mod move_generator {
 
         // Generate necassary values to check if the enemy king has been mated
         let enemy_team_bitboards = TeamBitboards {
-            friendly_team: team_bitboards.enemy_team ^ piece_move_bitoard,
-            enemy_team: team_bitboards.friendly_team ^ piece_move_xor_bitboard,
+            friendly_team: team_bitboards.enemy_team,
+            enemy_team: team_bitboards.friendly_team,
         };
 
         let friendly_attacks = gen_enemy_attacks(enemy_king, enemy_team_bitboards, &board, pieces_info);
@@ -1171,6 +1196,50 @@ pub mod move_generator {
         }
 
         #[test]
+        fn is_mate_test5() { // Test check mate
+            use crate::TeamBitboards;
+
+            let board = fen_decode("rn1qkbnr/pp2pppp/2p2N2/5b2/3P4/8/PPP2PPP/R1BQKBNR b KQkq - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
+            
+            assert_eq!(result, false);
+        }
+
+        #[test]
+        fn is_mate_test6() { // Test check mate
+            use crate::TeamBitboards;
+
+            let board = fen_decode("r2qkbnr/pp1npppp/3N4/1p3b2/3P4/8/PPP1QPPP/R1B1K1NR b - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
+            
+            assert_eq!(result, true);
+        }
+
+        #[test]
         fn new_turn_test1() { // Test board piece positions, moves bitboard, and points being updated after a move
             use crate::TeamBitboards;
 
@@ -1311,5 +1380,71 @@ pub mod move_generator {
 
             assert_eq!(new_turn_board, Err(TurnError::InvalidMoveCheck));            
         }
+
+        #[test]
+        fn new_turn_test5() { // Test moving a piece to win a game with checkmate
+            use crate::TeamBitboards;
+
+            let board = fen_decode("r1b1k1nr/ppppqppp/8/P1b1n3/3N4/8/1PP2PPP/RNBQKB1R b - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let enemy_king = BoardCoordinates {
+                board_index: 5,
+                bit: 60,
+            };
+
+            let piece = BoardCoordinates {
+                board_index: 8,
+                bit: 28,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let new_turn_board = new_turn(&piece, 45, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            assert_eq!(new_turn_board, Err(TurnError::Win));            
+        }
+
+        /*
+        #[test]
+        fn new_turn_test6() { // Test moving a piece to win a game with checkmate
+            use crate::TeamBitboards;
+
+            let board = fen_decode("r2qkbnr/pp1npppp/8/1p3b2/2NP4/8/PPP1QPPP/R1B1K1NR w - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 5,
+                bit: 60,
+            };
+
+            let enemy_king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let piece = BoardCoordinates {
+                board_index: 2,
+                bit: 34,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let new_turn_board = new_turn(&piece, 19, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            assert_eq!(new_turn_board, Err(TurnError::Win));            
+        }
+        */
     }
 }
