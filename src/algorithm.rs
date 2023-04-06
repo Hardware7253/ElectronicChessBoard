@@ -120,11 +120,6 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
         let final_piece_bit = moves[i].final_piece_bit;
 
         let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
-
-        if board.board == [65020753979899904, 9295429630892703744, 4611686018427912192, 288230376151711744, 4503599627370496, 1152921504606846976, 33616640, 129, 2112, 536870944, 8, 16, 9086293723196623998] {
-            println!("{:?}, {}", initial_piece_coordinates, final_piece_bit);
-            println!("{:?}", new_turn_board);
-        }
         
         match new_turn_board {
 
@@ -213,7 +208,6 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     if master_team {
         return min_max.max_move.unwrap();
     } else {
-        //println!("{:?}", board.board);
         empty_move.value = min_max.min_value.unwrap();
         return empty_move;
     }
@@ -464,7 +458,7 @@ mod tests {
 
     /*
     #[test]
-    fn gen_best_move_test3() { // Test a capture with en passant being the best move
+    fn gen_best_move_test3() {
         use crate::board::board_representation;
         use crate::board::move_generator;
 

@@ -128,6 +128,15 @@ pub fn find_bit_on(num: u64, default: usize) -> usize {
     default
 }
 
+// Return true if 2 numbers have a bit in common
+pub fn common_bit(num1: u64, num2: u64) -> bool {
+    let xor_nums = num1 ^ num2;
+    if xor_nums < num1 || xor_nums < num2 {
+        return true;
+    }
+    false
+}
+
 // Flips bitboard bit to enemy team perspective
 pub fn flip_bitboard_bit(bit: usize) -> usize {
     let flipped = bit as i8 - 63;
@@ -227,15 +236,23 @@ impl TeamBitboards {
         }
 
         #[test]
+        fn common_bit_test() {
+            assert_eq!(common_bit(5, 6), true);
+            assert_eq!(common_bit(3, 1), true);
+            assert_eq!(common_bit(9, 8), true);
+            assert_eq!(common_bit(10, 5), false);
+            assert_eq!(common_bit(7, 8), false);
+        }
+
+        #[test]
         fn gen_team_bitboards_test() {
-            let mut board = crate::board::board_representation::Board::new();
-            board.board = [1, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 8, 13];
+            let mut board = crate::board::board_representation::fen_decode("r2qkbnr/pp1npppp/3N4/1p3b2/3P4/8/PPP1QPPP/R1B1K1NR b - - 0 1", true);
 
             let result = TeamBitboards::new(10, &board);
 
             let expected = TeamBitboards {
-                friendly_team: 12,
-                enemy_team: 5,
+                friendly_team: 570489849,
+                enemy_team: 15417791883686445056,
             };
 
             assert_eq!(result, expected);

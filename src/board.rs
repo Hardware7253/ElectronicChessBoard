@@ -504,6 +504,11 @@ pub mod move_generator {
                 Err(_) => continue,
             };
 
+            // Don't use rook_bit if it is outside the range of the board
+            if rook_bit > 63 {
+                continue;
+            }
+
             // If the rook for this direction has moved the king cannot castle in this direction
             if bit_on(board.board[12], rook_bit) {
                 continue;
@@ -606,6 +611,7 @@ pub mod move_generator {
     // Return true if the given king is in mate
     fn is_mate(king: &board_representation::BoardCoordinates, enemy_attacks: &EnemyAttacks, team_bitboards: crate::TeamBitboards, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> bool {
         use crate::bit_on;
+        use crate::common_bit;
         use board_representation::BoardCoordinates;
 
         let king_piece_info = &pieces_info[5];
@@ -642,8 +648,6 @@ pub mod move_generator {
             }
         }
 
-        println!("{}", king_can_move);
-
         if !king_can_move {
 
             // If the king is in double check and the king can't move then it is mate
@@ -651,7 +655,7 @@ pub mod move_generator {
                 return true;
             }
 
-            let mut enemy_team_bitboards = crate::TeamBitboards {
+            let enemy_team_bitboards = crate::TeamBitboards {
                 friendly_team: team_bitboards.enemy_team,
                 enemy_team: team_bitboards.friendly_team,
             };
@@ -672,18 +676,22 @@ pub mod move_generator {
                 checking_piece_moves = 0;
             }
 
-            // Get friendly board indexes
+            // Get friendly and enemy board indexes
             // Don't include kings
             let friendly_indexes;
+            let enemy_indexes;
             let friendly_queen;
             if crate::board_index_white(king.board_index) {
                 friendly_indexes = 0..5;
+                enemy_indexes = 6..11;
                 friendly_queen = 4;
             } else {
                 friendly_indexes = 6..11;
+                enemy_indexes = 0..5;
                 friendly_queen = 10;
             }
 
+            // Check if there are any friendly moves
             let mut friendly_moves: u64 = 0;
             for i in friendly_indexes {
                 for j in 0..64 { // Friendly piece initial bit
@@ -698,15 +706,21 @@ pub mod move_generator {
                     }
 
                     let piece_moves = gen_piece(&board_coordinates, team_bitboards, false, board, pieces_info);
-                    
+
                     if use_checking_piece {
                         for l in 0..64 { // Friendly piece final bit
 
                             // If the piece that is putting the king in check can be blocked or captured then it is not mate
-                            if bit_on(piece_moves.moves_bitboard, l) && bit_on(checking_piece_moves, l) || bit_on(piece_moves.moves_bitboard, checking_piece.bit) {
+                            if l == king.bit {
+                                continue;
+                            }
+
+                            if bit_on(piece_moves.moves_bitboard, l) && bit_on(checking_piece_moves, l) || bit_on(piece_moves.moves_bitboard, checking_piece.bit) { // Only try moves that intercept a checking pieces path, or captures a checking piece
+                                let mut enemy_team_bitboards = enemy_team_bitboards;
                                 enemy_team_bitboards.enemy_team ^= 1 << j | 1 << l; // Piece on bitboard to new coordinates
                                 enemy_team_bitboards.friendly_team ^= 1 << l; // Capture piece
                                 
+                                // Get checking piece moves if the checking piece wasn't captured
                                 let checking_piece_moves;
                                 if l == checking_piece.bit {
                                     checking_piece_moves = 0;
@@ -716,19 +730,43 @@ pub mod move_generator {
                             
                                 // If the king isn't in check after the move then there is no mate
                                 if !bit_on(checking_piece_moves, king.bit) {
+
+                                    // Get squares that the king could be put in check from after the pieces is moved
                                     let team_bitboards = crate::TeamBitboards {
                                         friendly_team: enemy_team_bitboards.enemy_team,
                                         enemy_team: enemy_team_bitboards.friendly_team,
                                     };
 
+                                    // Use queen board index as king board index to generate king moves as if it were a queen
+                                    // This will get all the squares that could possibly be putting the king in check after the move
                                     let sliding_king = BoardCoordinates {
                                         board_index: friendly_queen,
                                         bit: king.bit,
                                     };
 
                                     let king_check_squares = gen_piece(&sliding_king, team_bitboards, false, board, pieces_info).moves_bitboard;
-                                    if bit_on(king_check_squares, 52) {
-                                        println!("{}", true);
+                                    if common_bit(king_check_squares, team_bitboards.enemy_team) { // If the king_check_squares and enemy_team bitboards both have the same bit on an enemy piece could potentially be putting the king in check after the move
+                                        
+                                        // Search for enemy piece(s) in the king_check_sqaures
+                                        for index in enemy_indexes {
+                                            if common_bit(board.board[index], king_check_squares) {
+                                                for bit in 0..64 {
+                                                    if bit_on(board.board[index], bit) && bit_on(king_check_squares, bit) {
+                                                        let board_coordinates = BoardCoordinates {
+                                                            board_index: index,
+                                                            bit: bit,
+                                                        };
+
+                                                        // If the piece can move to the king bit then it is checkmate
+                                                        let piece_moves = gen_piece(&board_coordinates, enemy_team_bitboards, false, board, pieces_info);
+                                                        
+                                                        if bit_on(piece_moves.moves_bitboard, king.bit) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                } 
+                                            }
+                                        }
                                     }
                                     return false;
                                 }
