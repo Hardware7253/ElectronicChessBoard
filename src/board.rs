@@ -1451,12 +1451,11 @@ pub mod move_generator {
             assert_eq!(new_turn_board, Err(TurnError::Win));            
         }
 
-        /*
         #[test]
-        fn new_turn_test6() { // Test moving a piece to win a game with checkmate
+        fn new_turn_test6() { // Test pawn not being able to capture another pawn when moving forwards
             use crate::TeamBitboards;
 
-            let board = fen_decode("r2qkbnr/pp1npppp/8/1p3b2/2NP4/8/PPP1QPPP/R1B1K1NR w - - 0 1", true);
+            let board = fen_decode("rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 1", true);
 
             let king = BoardCoordinates {
                 board_index: 5,
@@ -1469,8 +1468,8 @@ pub mod move_generator {
             };
 
             let piece = BoardCoordinates {
-                board_index: 2,
-                bit: 34,
+                board_index: 0,
+                bit: 35,
             };
 
             let team_bitboards = TeamBitboards::new(king.board_index, &board);
@@ -1479,10 +1478,78 @@ pub mod move_generator {
 
             let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-            let new_turn_board = new_turn(&piece, 19, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+            let new_turn_board = new_turn(&piece, 27, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
 
-            assert_eq!(new_turn_board, Err(TurnError::Win));            
+            assert_eq!(new_turn_board, Err(TurnError::InvalidMove));            
         }
-        */
+
+        #[test]
+        fn new_turn_test7() { // Test pawn invalid move
+            use crate::TeamBitboards;
+
+            let board = fen_decode("r2qkb1r/ppp1pppp/5n2/1B1PNb2/1n6/2N5/PPP2PPP/R1BQK2R b KQkq - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let enemy_king = BoardCoordinates {
+                board_index: 5,
+                bit: 60,
+            };
+
+            let piece = BoardCoordinates {
+                board_index: 6,
+                bit: 12,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let new_turn_board = new_turn(&piece, 11, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            assert_eq!(new_turn_board, Err(TurnError::InvalidMove));            
+        }
+
+        #[test]
+        fn new_turn_test8() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 11,
+                bit: 4,
+            };
+
+            let enemy_king = BoardCoordinates {
+                board_index: 5,
+                bit: 60,
+            };
+
+            let piece = BoardCoordinates {
+                board_index: 6,
+                bit: 12,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let new_turn_board = new_turn(&piece, 28, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            let mut expected_board = fen_decode("rnbqkbnr/pppp1ppp/8/4p3/P7/8/1PPPPPPP/RNBQKBNR w - - 0 1", true);
+            expected_board.board[12] = 18375249429624979711;
+            expected_board.turns_since_capture += 1;
+            expected_board.en_passant_target = Some(20);
+
+            assert_eq!(new_turn_board, Ok(expected_board));            
+        }
     }
 }

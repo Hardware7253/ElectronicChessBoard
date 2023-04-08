@@ -10,7 +10,7 @@ pub struct Move {
 }
 
 impl Move {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
                 board_index: 0,
@@ -462,9 +462,9 @@ mod tests {
         use crate::board::board_representation;
         use crate::board::move_generator;
 
-        let board = board_representation::fen_decode("rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 0 1", true);
+        let board = board_representation::fen_decode("rnbk1b2/1p6/p7/P2N4/1P6/4PBr1/5K2/R1B1R3 b Aq - 0 1", true);
 
-        let team_bitboards = TeamBitboards::new(0, &board);
+        let team_bitboards = TeamBitboards::new(8, &board);
 
         let pieces_info = crate::piece::constants::gen();
         

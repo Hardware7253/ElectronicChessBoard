@@ -74,7 +74,7 @@ pub mod constants {
 
             // Black team
             PieceInfo { // pawn
-                moves: [STRAIGHT_MOVES[3], 0, 0, 0, 0, 0, 0, 0],
+                moves: [STRAIGHT_MOVES[2], 0, 0, 0, 0, 0, 0, 0],
                 moves_no: 1,
                 move_only: true,
                 sliding: false,
