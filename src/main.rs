@@ -11,7 +11,7 @@ fn main() {
     println!("{:?}", board.board);
 
     let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    bug_board.board = [18375249429624983807, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    bug_board.board = [7926616819148718190, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     //bug_board.board = [65020719754379264, 9295429630892703744, 4398314946560, 288230376185266176, 576460752303423488, 1152921504606846976, 61184, 129, 8592031744, 536870944, 8, 16, 9086293723196622974];
 
     let bug_board_fen_encode = board_representation::fen_encode(&bug_board);

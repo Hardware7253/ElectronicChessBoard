@@ -318,11 +318,6 @@ mod tests {
             bit: 63,
         };
 
-        let enemy_king = board_representation::BoardCoordinates {
-            board_index: 11,
-            bit: 0,
-        };
-
         let team_bitboards = TeamBitboards::new(king.board_index, &board);
 
         let pieces_info = crate::piece::constants::gen();
@@ -346,7 +341,6 @@ mod tests {
     #[test]
     fn update_min_max_test() {
         use crate::board::board_representation;
-        use crate::board::move_generator;
 
         let max_move = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -385,7 +379,6 @@ mod tests {
     #[test]
     fn update_prune_value_test() {
         use crate::board::board_representation;
-        use crate::board::move_generator;
 
         let piece_move = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -409,11 +402,8 @@ mod tests {
     #[test]
     fn gen_best_move_test1() {
         use crate::board::board_representation;
-        use crate::board::move_generator;
 
         let board = board_representation::fen_decode("7k/2K5/8/8/8/r2r4/3R3n/8 w - - 0 1", true);
-
-        let team_bitboards = TeamBitboards::new(0, &board);
 
         let pieces_info = crate::piece::constants::gen();
         
@@ -434,11 +424,8 @@ mod tests {
     #[test]
     fn gen_best_move_test2() { // Test a capture with en passant being the best move
         use crate::board::board_representation;
-        use crate::board::move_generator;
 
         let board = board_representation::fen_decode("K7/8/8/4pP2/8/8/8/k7 w - e6 0 1", true);
-
-        let team_bitboards = TeamBitboards::new(0, &board);
 
         let pieces_info = crate::piece::constants::gen();
         
@@ -460,11 +447,8 @@ mod tests {
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
-        use crate::board::move_generator;
 
         let board = board_representation::fen_decode("rnbk1b2/1p6/p7/P2N4/1P6/4PBr1/5K2/R1B1R3 b Aq - 0 1", true);
-
-        let team_bitboards = TeamBitboards::new(8, &board);
 
         let pieces_info = crate::piece::constants::gen();
         

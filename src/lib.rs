@@ -246,7 +246,7 @@ impl TeamBitboards {
 
         #[test]
         fn gen_team_bitboards_test() {
-            let mut board = crate::board::board_representation::fen_decode("r2qkbnr/pp1npppp/3N4/1p3b2/3P4/8/PPP1QPPP/R1B1K1NR b - - 0 1", true);
+            let board = crate::board::board_representation::fen_decode("r2qkbnr/pp1npppp/3N4/1p3b2/3P4/8/PPP1QPPP/R1B1K1NR b - - 0 1", true);
 
             let result = TeamBitboards::new(10, &board);
 
