@@ -6,17 +6,15 @@ use chess2::board::move_generator::TurnError;
 
 fn main() {
 
-    /*
     let board = board_representation::fen_decode("P2PPPPP/PP1PPPPP/8/1P3P2/8/8/8/8 b - - 0 1", true);
     println!("{:?}", board.board);
 
     let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    bug_board.board = [7926616819148718190, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    bug_board.board = [7611980571845066752, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     //bug_board.board = [65020719754379264, 9295429630892703744, 4398314946560, 288230376185266176, 576460752303423488, 1152921504606846976, 61184, 129, 8592031744, 536870944, 8, 16, 9086293723196622974];
 
     let bug_board_fen_encode = board_representation::fen_encode(&bug_board);
     println!("{}", bug_board_fen_encode);
-    */
 
     // Get team of the player
     print!("Player White? ");
@@ -28,6 +26,11 @@ fn main() {
     let pieces_info = chess2::piece::constants::gen();
 
     loop {
+        if board.turns_since_capture == 50 {
+            println!("Draw, too many moves since last capture");
+            break;
+        }
+
         let player_turn = player_white == board.whites_move;
 
         let mut piece_move = Move::new();
@@ -82,23 +85,22 @@ fn main() {
         let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, &pieces_info);
         let new_turn_board = move_generator::new_turn(&piece_move.initial_piece_coordinates, piece_move.final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
 
+        let mut initial_bit = piece_move.initial_piece_coordinates.bit;
+        let mut final_bit = piece_move.final_piece_bit;
+        
+        // Flip bitboard bits back to the right perspective if the player is on the black team
+        if !player_white {
+            initial_bit = chess2::flip_bitboard_bit(initial_bit);
+            final_bit = chess2::flip_bitboard_bit(final_bit);
+        }
+
+        // Convert moves to ccn
+        let initial_ccn = chess2::bit_to_ccn(initial_bit);
+        let final_ccn = chess2::bit_to_ccn(final_bit);
+
         match new_turn_board {
             Ok(new_board) => {
-                if !player_turn { // If ai move
-
-                    let mut initial_bit = piece_move.initial_piece_coordinates.bit;
-                    let mut final_bit = piece_move.final_piece_bit;
-                    
-                    // Flip bitboard bits back to the right perspective if the player is on the black team
-                    if !player_white {
-                        initial_bit = chess2::flip_bitboard_bit(initial_bit);
-                        final_bit = chess2::flip_bitboard_bit(final_bit);
-                    }
-        
-                    // Convert moves to ccn and print them
-                    let initial_ccn = chess2::bit_to_ccn(initial_bit);
-                    let final_ccn = chess2::bit_to_ccn(final_bit);
-        
+                if !player_turn { // If ai move        
                     println!("Ai moves from {}, to {}", initial_ccn, final_ccn);
                     println!("");
                 }
@@ -109,6 +111,12 @@ fn main() {
             Err(error) => { // End the game, or let the game continue depending on the error
                 match error {
                     TurnError::Win => {
+
+                        if !player_turn { // If ai move        
+                            println!("Ai moves from {}, to {}", initial_ccn, final_ccn);
+                            println!("");
+                        }
+
                         if board.whites_move {
                             println!("White team wins");
                         } else {
