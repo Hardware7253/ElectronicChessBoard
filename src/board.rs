@@ -475,7 +475,7 @@ pub mod move_generator {
 
     }
 
-    // Assumes the given piece is a king, and that the moves bitboard is accurate
+    
     fn castle(king: &board_representation::BoardCoordinates, king_move_bit: usize, team_bitboards: &crate::TeamBitboards, enemy_attack_bitboard: u64, board: &board_representation::Board) -> Moves {
         use crate::bit_on;
 
@@ -500,16 +500,14 @@ pub mod move_generator {
                 Err(_) => continue,
             };
 
-            // Don't use rook_bit if it is outside the range of the board
-            if rook_bit > 63 {
+            // A castle cannot be performed in this direction if the rook is:
+            // Outside the range of the board
+            // Doesn't exist on the board
+            // Not at moves = 0
+            if rook_bit > 63 || !bit_on(board.board[king.board_index - 4], rook_bit) || bit_on(board.board[12], rook_bit) {
                 continue;
             }
 
-            // If the rook for this direction has moved the king cannot castle in this direction
-            if bit_on(board.board[12], rook_bit) {
-                continue;
-            }
-            
             for j in 0..2 {
                 let piece_move_bit = usize::try_from(piece_bit as i8 + king_castle_moves[i]).unwrap();
                 
@@ -632,13 +630,9 @@ pub mod move_generator {
 
                         let checking_piece_moves = gen_piece(&checking_piece, new_team_bitboards, true, board, pieces_info);
                         if bit_on(checking_piece_moves.moves_bitboard, king_move_bit) {
-                            // If the king is still in check it cannot move here
-                            king_can_move = false;
-                            continue;
+                            king_can_move = false; // If the king is still in check it cannot move here
                         }
                     }
-                    
-                    break;
                 }
             }
         }
@@ -915,7 +909,7 @@ pub mod move_generator {
         }
 
         // Don't keep en passant target from the piece moves if the pawn didn't move 2 squares
-        if (piece_move_bit as i8 - piece.bit as i8).abs() < 9 {
+        if (piece_move_bit as i8 - piece.bit as i8).abs() != 16 {
             board.en_passant_target = None;
         }
 
@@ -1070,14 +1064,14 @@ pub mod move_generator {
         fn castle_test() {
             use crate::TeamBitboards;
 
-            let board = fen_decode("r3k2r/8/8/8/8/8/8/8 w kq - 0 1", true);
+            let board = fen_decode("r3k2r/8/8/8/8/8/8/8 b kq - 0 1", true);
 
-            let piece = BoardCoordinates {
-                board_index: 5,
+            let king = BoardCoordinates {
+                board_index: 11,
                 bit: 4,
             };
 
-            let team_bitboards = TeamBitboards::new(piece.board_index, &board);
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
 
             let expected = Moves {
                 moves_bitboard: 1 << 2,
@@ -1085,8 +1079,8 @@ pub mod move_generator {
                 en_passant_capture_bit: Some(0),
             };
             
-            assert_eq!(castle(&piece, 2, &team_bitboards, 0, &board), expected); // Valid castle
-            assert_eq!(castle(&piece, 2, &team_bitboards, 4, &board), Moves::new()); // Test an enemy attack blocking the path
+            assert_eq!(castle(&king, 2, &team_bitboards, 0, &board), expected); // Valid castle
+            assert_eq!(castle(&king, 2, &team_bitboards, 4, &board), Moves::new()); // Test an enemy attack blocking the path
         }
 
         #[test]
@@ -1303,6 +1297,29 @@ pub mod move_generator {
             let pieces_info = crate::piece::constants::gen();
 
             let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
+            
+            assert_eq!(result, false);
+        }
+
+        #[test]
+        fn is_mate_test8() { // Test king not being in mate
+            use crate::TeamBitboards;
+
+            let board = fen_decode("2n2bR1/2k5/7p/p1p1p3/2p1P1P1/8/PPP2PKP/6r1 w - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 5,
+                bit: 54,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+            println!("{:?}", team_bitboards);
 
             let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
             

@@ -448,7 +448,7 @@ mod tests {
     fn gen_best_move_test3() {
         use crate::board::board_representation;
 
-        let board = board_representation::fen_decode("r1b2knr/4b1q1/2n1p2p/pNP2p1p/8/4BN2/PP3PPP/R2Q1RK1 b - - 0 1", true);
+        let board = board_representation::fen_decode("rnbqkbnr/6pp/ppp1pp2/4P3/2B5/2N2N2/PPP2PPP/R1BQ1K1R b kq - 0 1", true);
 
         let pieces_info = crate::piece::constants::gen();
         
