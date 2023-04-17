@@ -6,12 +6,12 @@ use chess2::board::move_generator::TurnError;
 
 fn main() {
 
-    let board = board_representation::fen_decode("P2PPPPP/PP1PPPPP/8/1P3P2/8/8/8/8 b - - 0 1", true);
+    let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
     println!("{:?}", board.board);
 
     let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    bug_board.board = [13828032701116865358, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    //bug_board.board = [65020719754379264, 9295429630892703744, 4398314946560, 288230376185266176, 576460752303423488, 1152921504606846976, 61184, 129, 8592031744, 536870944, 8, 16, 9086293723196622974];
+    //bug_board.board = [14033825650101976839, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    bug_board.board = [75316814938112, 0, 35184372088832, 33554432, 72057594037927936, 576460752303423488, 2286157824, 128, 140737488355330, 274886295552, 2251799813685248, 16, 18446744073709551615];
 
     let bug_board_fen_encode = board_representation::fen_encode(&bug_board);
     println!("{}", bug_board_fen_encode);

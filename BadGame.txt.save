@@ -1,0 +1,449 @@
+:Turn start, Whites turn: true
+Board { board: [71776119061217280, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 65280, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+d2
+
+To new coordinates:
+d4
+
+Turn start, Whites turn: false
+Board { board: [69524353607270400, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 65280, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 1, en_passant_target: Some(43) }
+
+Ai moves from a7, to a6
+
+Turn start, Whites turn: true
+Board { board: [69524353607270400, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 130560, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Move piece from coordinates:
+d4
+
+To new coordinates:
+d5
+
+Turn start, Whites turn: false
+Board { board: [69524319381749760, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 130560, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Ai moves from b7, to b6
+
+Turn start, Whites turn: true
+Board { board: [69524319381749760, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 261120, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Move piece from coordinates:
+d5
+
+To new coordinates:
+d6
+
+Turn start, Whites turn: false
+Board { board: [69524319248056320, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 261120, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 0 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Ai moves from c7, to d6
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 784384, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 1 }, points_delta: 1, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+c1
+
+To new coordinates:
+e3
+
+Turn start, Whites turn: false
+Board { board: [69524319247532032, 9295429630892703744, 4755801206503243776, 2305860601399738368, 576460752303423488, 1152921504606846976, 784384, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Ai moves from e7, to e6
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 4755801206503243776, 2305860601399738368, 576460752303423488, 1152921504606846976, 1828864, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Move piece from coordinates:
+b1
+
+To new coordinates:
+c3
+
+Turn start, Whites turn: false
+Board { board: [69524319247532032, 9295429630892703744, 4611690416473899008, 2305860601399738368, 576460752303423488, 1152921504606846976, 1828864, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Ai moves from g7, to g6
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 4611690416473899008, 2305860601399738368, 576460752303423488, 1152921504606846976, 6006784, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Move piece from coordinates:
+g1
+
+To new coordinates:
+f3
+
+Turn start, Whites turn: false
+Board { board: [69524319247532032, 9295429630892703744, 39582418599936, 2305860601399738368, 576460752303423488, 1152921504606846976, 6006784, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Ai moves from f7, to f6
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 39582418599936, 2305860601399738368, 576460752303423488, 1152921504606846976, 8095744, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 6, en_passant_target: None }
+
+Move piece from coordinates:
+c3
+
+To new coordinates:
+a4
+
+Turn start, Whites turn: false
+Board { board: [69524319247532032, 9295429630892703744, 35188667056128, 2305860601399738368, 576460752303423488, 1152921504606846976, 8095744, 129, 66, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 7, en_passant_target: None }
+
+Ai moves from b8, to c6
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 35188667056128, 2305860601399738368, 576460752303423488, 1152921504606846976, 8095744, 129, 262208, 36, 8, 16, 7926616819148718190], whites_move: true, points: Points { white_points: 0, black_points: 1 }, points_delta: 0, turns_since_capture: 8, en_passant_target: None }
+
+Move piece from coordinates:
+e3
+
+To new coordinates:
+b6
+
+Turn start, Whites turn: false
+Board { board: [69524319247532032, 9295429630892703744, 35188667056128, 2305843009213825024, 576460752303423488, 1152921504606846976, 7964672, 129, 262208, 36, 8, 16, 7926616819148718190], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 1, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from d8, to e7
+
+Turn start, Whites turn: true
+Board { board: [69524319247532032, 9295429630892703744, 35188667056128, 2305843009213825024, 576460752303423488, 1152921504606846976, 7964672, 129, 262208, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Move piece from coordinates:
+e2
+
+To new coordinates:
+e4
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 2305843009213825024, 576460752303423488, 1152921504606846976, 7964672, 129, 262208, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 2, en_passant_target: Some(44) }
+
+Ai moves from h7, to h6
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 2305843009213825024, 576460752303423488, 1152921504606846976, 16320512, 129, 262208, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Move piece from coordinates:
+f1
+
+To new coordinates:
+d3
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 8796093153280, 576460752303423488, 1152921504606846976, 16320512, 129, 262208, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Ai moves from c6, to b4
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 8796093153280, 576460752303423488, 1152921504606846976, 16320512, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Move piece from coordinates:
+d3
+
+To new coordinates:
+c4 
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 17180000256, 576460752303423488, 1152921504606846976, 16320512, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 6, en_passant_target: None }
+
+Ai moves from a6, to a5
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 35188667056128, 17180000256, 576460752303423488, 1152921504606846976, 33032192, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 7, en_passant_target: None }
+
+Move piece from coordinates:
+f3
+
+To new coordinates:
+d4
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 38654705664, 17180000256, 576460752303423488, 1152921504606846976, 33032192, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 8, en_passant_target: None }
+
+Ai moves from d6, to d5
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 38654705664, 17180000256, 576460752303423488, 1152921504606846976, 166725632, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 9, en_passant_target: None }
+
+Move piece from coordinates:
+b6 
+
+To new coordinates:
+c5
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 38654705664, 17246978048, 576460752303423488, 1152921504606846976, 166725632, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 10, en_passant_target: None }
+
+Ai moves from d7, to d6
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 38654705664, 17246978048, 576460752303423488, 1152921504606846976, 167247872, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 11, en_passant_target: None }
+
+Move piece from coordinates:
+a4
+
+To new coordinates:
+b6
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 34359869440, 17246978048, 576460752303423488, 1152921504606846976, 167247872, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: false, points: Points { white_points: 1, black_points: 1 }, points_delta: 0, turns_since_capture: 12, en_passant_target: None }
+
+Ai moves from d6, to c5
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 34359869440, 17179869184, 576460752303423488, 1152921504606846976, 233832448, 129, 8589934656, 36, 4096, 16, 7926616819148722286], whites_move: true, points: Points { white_points: 1, black_points: 4 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+b6
+
+To new coordinates:
+a8
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 34359738369, 17179869184, 576460752303423488, 1152921504606846976, 233832448, 128, 8589934656, 36, 4096, 16, 7926616819148722287], whites_move: false, points: Points { white_points: 6, black_points: 4 }, points_delta: 5, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from d5, to c4
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 34359738369, 0, 576460752303423488, 1152921504606846976, 17279483904, 128, 8589934656, 36, 4096, 16, 7926616819148722287], whites_move: true, points: Points { white_points: 6, black_points: 7 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+d4
+
+To new coordinates:
+b5
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 33554433, 0, 576460752303423488, 1152921504606846976, 17279483904, 128, 8589934656, 36, 4096, 16, 7926616819148722287], whites_move: false, points: Points { white_points: 6, black_points: 7 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Ai moves from e7, to d8
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 33554433, 0, 576460752303423488, 1152921504606846976, 17279483904, 128, 8589934656, 36, 8, 16, 7926616819148722287], whites_move: true, points: Points { white_points: 6, black_points: 7 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Move piece from coordinates:
+d1
+
+To new coordinates:
+d2
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9295429630892703744, 33554433, 0, 2251799813685248, 1152921504606846976, 17279483904, 128, 8589934656, 36, 8, 16, 7928868618962407535], whites_move: false, points: Points { white_points: 6, black_points: 7 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Ai moves from b4, to a6
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9295429630892703744, 33554433, 0, 2251799813685248, 1152921504606846976, 17279483904, 128, 65600, 36, 8, 16, 7928868618962407535], whites_move: true, points: Points { white_points: 6, black_points: 7 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Move piece from coordinates:
+a1
+
+To new coordinates:
+d1
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9799832789158199296, 33554433, 0, 2251799813685248, 1152921504606846976, 17279483904, 128, 65600, 36, 8, 16, 7928868618962407535], whites_move: false, points: Points { white_points: 6, black_points: 7 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Ai moves from d8, to d2
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9799832789158199296, 33554433, 0, 0, 1152921504606846976, 17279483904, 128, 65600, 36, 2251799813685248, 16, 7928868618962407535], whites_move: true, points: Points { white_points: 6, black_points: 16 }, points_delta: 9, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+d1
+
+To new coordinates:
+d2
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 9225623836668461056, 33554433, 0, 0, 1152921504606846976, 17279483904, 128, 65600, 36, 0, 16, 7928868618962407535], whites_move: false, points: Points { white_points: 15, black_points: 16 }, points_delta: 9, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from a6, to b8
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 9225623836668461056, 33554433, 0, 0, 1152921504606846976, 17279483904, 128, 66, 36, 0, 16, 7928868618962407535], whites_move: true, points: Points { white_points: 15, black_points: 16 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Move piece from coordinates:
+e1
+
+To new coordinates:
+g1
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 2308094809027379200, 33554433, 0, 0, 4611686018427387904, 17279483904, 128, 66, 36, 0, 16, 7928868618962407535], whites_move: false, points: Points { white_points: 16, black_points: 16 }, points_delta: 1, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from e6, to e5
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 2308094809027379200, 33554433, 0, 0, 4611686018427387904, 17546870784, 128, 66, 36, 0, 16, 7928868618962407535], whites_move: true, points: Points { white_points: 16, black_points: 16 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Move piece from coordinates:
+f1
+
+To new coordinates:
+d1
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 578712552117108736, 33554433, 0, 0, 4611686018427387904, 17546870784, 128, 66, 36, 0, 16, 7928868618962407535], whites_move: false, points: Points { white_points: 16, black_points: 16 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Ai moves from c8, to d7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 578712552117108736, 33554433, 0, 0, 4611686018427387904, 17546870784, 128, 66, 2080, 0, 16, 7928868618962409583], whites_move: true, points: Points { white_points: 16, black_points: 16 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Move piece from coordinates:
+b5
+
+To new coordinates:
+c7 
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 578712552117108736, 1025, 0, 0, 4611686018427387904, 17546870784, 128, 66, 2080, 0, 16, 7928868618962410607], whites_move: false, points: Points { white_points: 16, black_points: 16 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Ai moves from e8, to d8
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 578712552117108736, 1025, 0, 0, 4611686018427387904, 17546870784, 128, 66, 2080, 0, 8, 7928868618962410607], whites_move: true, points: Points { white_points: 16, black_points: 16 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Move piece from coordinates:
+d2
+
+To new coordinates:
+d7
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 576460752303425536, 1025, 0, 0, 4611686018427387904, 17546870784, 128, 66, 32, 0, 8, 7928868618962410607], whites_move: false, points: Points { white_points: 19, black_points: 16 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from b8, to d7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 576460752303423488, 1025, 0, 0, 4611686018427387904, 17546870784, 128, 2112, 32, 0, 8, 7928868618962410607], whites_move: true, points: Points { white_points: 19, black_points: 21 }, points_delta: 5, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+a8
+
+To new coordinates:
+b6
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 576460752303423488, 132096, 0, 0, 4611686018427387904, 17546870784, 128, 2112, 32, 0, 8, 7928868618962410607], whites_move: false, points: Points { white_points: 19, black_points: 21 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Ai moves from d8, to c7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 576460752303423488, 131072, 0, 0, 4611686018427387904, 17546870784, 128, 2112, 32, 0, 1024, 7928868618962410607], whites_move: true, points: Points { white_points: 19, black_points: 24 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+d1
+
+To new coordinates:
+d7
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 2048, 131072, 0, 0, 4611686018427387904, 17546870784, 128, 64, 32, 0, 1024, 7928868618962410607], whites_move: false, points: Points { white_points: 22, black_points: 24 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from c7, to b6
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 2048, 0, 0, 0, 4611686018427387904, 17546870784, 128, 64, 32, 0, 131072, 7928868618962410607], whites_move: true, points: Points { white_points: 22, black_points: 27 }, points_delta: 3, turns_since_capture: 0, en_passant_target: None }
+
+Move piece from coordinates:
+d7
+
+To new coordinates:
+d8
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 8, 0, 0, 0, 4611686018427387904, 17546870784, 128, 64, 32, 0, 131072, 7928868618962410607], whites_move: false, points: Points { white_points: 22, black_points: 27 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Ai moves from g8, to e7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 8, 0, 0, 0, 4611686018427387904, 17546870784, 128, 4096, 32, 0, 131072, 7928868618962410607], whites_move: true, points: Points { white_points: 22, black_points: 27 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Move piece from coordinates:
+d8
+
+To new coordinates:
+d6
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 524288, 0, 0, 0, 4611686018427387904, 17546870784, 128, 4096, 32, 0, 131072, 7928868618962410607], whites_move: false, points: Points { white_points: 22, black_points: 27 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Ai moves from b6, to c7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 524288, 0, 0, 0, 4611686018427387904, 17546870784, 128, 4096, 32, 0, 1024, 7928868618962410607], whites_move: true, points: Points { white_points: 22, black_points: 27 }, points_delta: 0, turns_since_capture: 4, en_passant_target: None }
+
+Move piece from coordinates:
+d6
+
+To new coordinates:
+f6
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 2097152, 0, 0, 0, 4611686018427387904, 17544773632, 128, 4096, 32, 0, 1024, 7928868618962410607], whites_move: false, points: Points { white_points: 23, black_points: 27 }, points_delta: 1, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from e7, to c8
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 2097152, 0, 0, 0, 4611686018427387904, 17544773632, 128, 4, 32, 0, 1024, 7928868618962410607], whites_move: true, points: Points { white_points: 23, black_points: 27 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Move piece from coordinates:
+f6
+
+To new coordinates:
+g6
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 4194304, 0, 0, 0, 4611686018427387904, 17540579328, 128, 4, 32, 0, 1024, 7928868618962410607], whites_move: false, points: Points { white_points: 24, black_points: 27 }, points_delta: 1, turns_since_capture: 0, en_passant_target: None }
+
+Ai moves from h8, to h7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 4194304, 0, 0, 0, 4611686018427387904, 17540579328, 32768, 4, 32, 0, 1024, 7928868618962443375], whites_move: true, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 1, en_passant_target: None }
+
+Move piece from coordinates:
+g6
+
+To new coordinates:
+g8
+
+Turn start, Whites turn: false
+Board { board: [65020788339638272, 64, 0, 0, 0, 4611686018427387904, 17540579328, 32768, 4, 32, 0, 1024, 7928868618962443375], whites_move: false, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 2, en_passant_target: None }
+
+Ai moves from h7, to d7
+
+Turn start, Whites turn: true
+Board { board: [65020788339638272, 64, 0, 0, 0, 4611686018427387904, 17540579328, 2048, 4, 32, 0, 1024, 7928868618962443375], whites_move: true, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 3, en_passant_target: None }
+
+Move piece from coordinates:
+g2
+
+To new coordinates:
+g4
+
+Turn start, Whites turn: false
+Board { board: [47006664708063232, 64, 0, 0, 0, 4611686018427387904, 17540579328, 2048, 4, 32, 0, 1024, 7928868618962443375], whites_move: false, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 4, en_passant_target: Some(46) }
+
+Ai moves from d7, to d1
+
+Turn start, Whites turn: true
+Board { board: [47006664708063232, 64, 0, 0, 0, 4611686018427387904, 17540579328, 576460752303423488, 4, 32, 0, 1024, 7928868618962443375], whites_move: true, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 5, en_passant_target: None }
+
+Move piece from coordinates:
+g1
+
+To new coordinates:
+g2
+
+Turn start, Whites turn: false
+Board { board: [47006664708063232, 64, 0, 0, 0, 18014398509481984, 17540579328, 576460752303423488, 4, 32, 0, 1024, 7946883017471925359], whites_move: false, points: Points { white_points: 24, black_points: 27 }, points_delta: 0, turns_since_capture: 6, en_passant_target: None }
+
+Ai moves from d1, to g1
+
+Black team wins

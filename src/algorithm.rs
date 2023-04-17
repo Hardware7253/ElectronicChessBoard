@@ -249,7 +249,7 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                 continue;
             }
 
-            let piece_moves = crate::board::move_generator::gen_piece(&initial_piece_coordinates, team_bitboards, false, board, pieces_info);
+            let piece_moves = crate::board::move_generator::gen_piece(&initial_piece_coordinates, None, team_bitboards, false, board, pieces_info);
             
             for final_bit in 0..64 {
 
@@ -448,7 +448,7 @@ mod tests {
     fn gen_best_move_test3() {
         use crate::board::board_representation;
 
-        let board = board_representation::fen_decode("rnbqkbnr/6pp/ppp1pp2/4P3/2B5/2N2N2/PPP2PPP/R1BQ1K1R b kq - 0 1", true);
+        let board = board_representation::fen_decode("1nb1kb1r/8/2p3p1/1p1pP2p/7P/2P3Pn/4Bq1N/Q2K4 b - - 0 1", true);
 
         let pieces_info = crate::piece::constants::gen();
         

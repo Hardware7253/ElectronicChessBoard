@@ -223,6 +223,7 @@ impl TeamBitboards {
         #[test]
         fn bit_on_test() {
             assert_eq!(bit_on(4, 2), true);
+            assert_eq!(bit_on(0, 1), false);
         }
 
         #[test]
