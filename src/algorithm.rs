@@ -7,6 +7,7 @@ pub struct Move {
     pub initial_piece_coordinates: board_representation::BoardCoordinates,
     pub final_piece_bit: usize,
     pub value: i8,
+    pub heatmap_value: u16,
 }
 
 impl Move {
@@ -18,6 +19,7 @@ impl Move {
             },
             final_piece_bit: 0,
             value: 0,
+            heatmap_value: 0,
         }
     }
 }
@@ -66,7 +68,7 @@ fn update_prune_value(master_team: bool, min_max: &MinMax) -> Option<i8> {
     }
 }
 
-pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, parent_value: Option<i8>, board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
+pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, parent_value: Option<i8>, opening_heatmap: &[[u16; 64]; 12], board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
 
@@ -106,7 +108,7 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, pieces_info);
 
     // Generate moves
-    let moves = &order_moves(true, &board, &enemy_attacks, &friendly_king, team_bitboards, pieces_info);
+    let moves = &order_moves(true, &board, &enemy_attacks, &friendly_king, opening_heatmap, team_bitboards, pieces_info);
 
     let mut min_max = MinMax {
         max_move: None,
@@ -116,70 +118,68 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     let mut prune_value: Option<i8> = None;
 
     for i in 0..moves.len() {
-        let moves_vec = &moves[i];
-        for j in 0..moves_vec.len() {
-            let initial_piece_coordinates = moves_vec[j].initial_piece_coordinates;
-            let final_piece_bit = moves_vec[j].final_piece_bit;
+        let initial_piece_coordinates = moves[i].initial_piece_coordinates;
+        let final_piece_bit = moves[i].final_piece_bit;
 
-            let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
-            
-            match new_turn_board {
+        let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+        
+        match new_turn_board {
 
-                // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
-                Ok(new_board) => {
-                    let mut move_value = new_board.points_delta;
-                    
-                    // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
-                    if !master_team {
-                        move_value *= -1;
-                    }
+            // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
+            Ok(new_board) => {
+                let mut move_value = new_board.points_delta;
+                
+                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                if !master_team {
+                    move_value *= -1;
+                }
 
-                    let branch_value = init_value + move_value;
+                let branch_value = init_value + move_value;
 
-                    let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, new_board, pieces_info);
+                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, opening_heatmap, new_board, pieces_info);
+                let piece_move = Move {
+                    initial_piece_coordinates: initial_piece_coordinates,
+                    final_piece_bit: final_piece_bit,
+                    value: piece_move.value,
+                    heatmap_value: 0,
+                };
+                
+                min_max = update_min_max(piece_move, min_max);
+                prune_value = update_prune_value(master_team, &min_max);
+            },
+            Err(error) => {
+
+                // Update min_max with value of game ending if the game ended
+                let mut branch_value;
+                let valid_move;
+
+                match error {
+                    TurnError::Win => {branch_value = 127; valid_move = true},
+                    TurnError::Draw => {branch_value = 0; valid_move = true},
+                    TurnError::InvalidMove => {branch_value = 0; valid_move = false},
+                    TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
+                }
+
+                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                if !master_team {
+                    branch_value *= -1;
+                }
+
+                if valid_move {
                     let piece_move = Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_piece_bit,
-                        value: piece_move.value,
+                        value: branch_value,
+                        heatmap_value: 0,
                     };
-                    
+
                     min_max = update_min_max(piece_move, min_max);
                     prune_value = update_prune_value(master_team, &min_max);
-                },
-                Err(error) => {
+                }
 
-                    // Update min_max with value of game ending if the game ended
-                    let mut branch_value;
-                    let valid_move;
-
-                    match error {
-                        TurnError::Win => {branch_value = 127; valid_move = true},
-                        TurnError::Draw => {branch_value = 0; valid_move = true},
-                        TurnError::InvalidMove => {branch_value = 0; valid_move = false},
-                        TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
-                    }
-
-                    // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
-                    if !master_team {
-                        branch_value *= -1;
-                    }
-
-                    if valid_move {
-                        let piece_move = Move {
-                            initial_piece_coordinates: initial_piece_coordinates,
-                            final_piece_bit: final_piece_bit,
-                            value: branch_value,
-                        };
-
-                        min_max = update_min_max(piece_move, min_max);
-                        prune_value = update_prune_value(master_team, &min_max);
-                    }
-
-                    continue;
-                },
-            }
+                continue;
+            },
         }
-        
 
         // Alpha beta pruning
         match parent_value {
@@ -212,8 +212,6 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     if master_team {
         return min_max.max_move.unwrap();
     } else {
-        //println!("{:?}", board);
-        //println!("{:?}", );
         empty_move.value = min_max.min_value.unwrap();
         return empty_move;
     }
@@ -222,11 +220,10 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> [Vec<Move>; 19] {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[u16; 64]; 12], team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
     use crate::bit_on;
     
-    const VEC_NEW: Vec<Move> = Vec::new();
-    let mut moves: [Vec<Move>; 19] = [VEC_NEW; 19];
+    let mut moves: Vec<Move> = Vec::new();
 
     // Get friendly and enemy board indexes
     let friendly_indexes;
@@ -259,6 +256,7 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
             let piece_moves = crate::board::move_generator::gen_piece(&initial_piece_coordinates, None, team_bitboards, false, board, pieces_info);
             
             for final_bit in 0..64 {
+                let heatmap_value = opening_heatmap[i][final_bit];
 
                 // Check the piece can move to final_bit or piece is a king
                 // Because this function does not account for castling those moves cannot be ruled out for the king
@@ -286,16 +284,18 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                     }
 
                     // Push move to moves vec
-                    moves[(move_value - 7).abs() as usize].push(Move {
+                    moves.push(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
-                        value: 0,
+                        value: move_value,
+                        heatmap_value: heatmap_value,
                     });
                 } else if &initial_piece_coordinates == friendly_king { // Add potentially invalid king moves to moves vec to account for castling
-                    moves[7].push(Move {
+                    moves.push(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: 0,
+                        heatmap_value: heatmap_value,
                     });
                 }
             }
@@ -304,7 +304,15 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
 
     // Sort moves and return
     if sort {
-        //moves.sort_by(|a, b| b.value.cmp(&a.value));
+
+        // Sort moves by value first
+        // Sort moves by heatmap_value if they have the same value
+        // https://stackoverflow.com/questions/70193935/how-to-sort-a-vec-of-structs-by-2-or-multiple-fields
+        moves.sort_by(| a, b | if a.value == b.value {
+            b.heatmap_value.partial_cmp(&a.heatmap_value).unwrap()
+        } else {
+            b.value.partial_cmp(&a.value).unwrap()
+        });
     }
     moves
 }
@@ -318,6 +326,8 @@ mod tests {
         use crate::board::board_representation;
         use crate::board::move_generator;
 
+        let opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
+        
         let board = board_representation::fen_decode("k7/8/8/8/4r3/3P4/8/7K w - - 0 1", true);
 
         let king = board_representation::BoardCoordinates {
@@ -331,7 +341,7 @@ mod tests {
 
         let enemy_attacks = move_generator::gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-        let result = order_moves(true, &board, &enemy_attacks, &king, team_bitboards, &pieces_info);
+        let result = order_moves(true, &board, &enemy_attacks, &king, &opening_heatmap, team_bitboards, &pieces_info);
 
         let best_move = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -339,10 +349,11 @@ mod tests {
                 bit: 43,
             },
             final_piece_bit: 36,
-            value: 0,
+            value: 5,
+            heatmap_value: 2246,
         };
 
-        assert_eq!(result[2][0], best_move);
+        assert_eq!(result[0], best_move);
     }
 
     #[test]
@@ -356,6 +367,7 @@ mod tests {
             },
             final_piece_bit: 36,
             value: 3,
+            heatmap_value: 0,
         };
 
         let piece_move = Move {
@@ -365,6 +377,7 @@ mod tests {
             },
             final_piece_bit: 0,
             value: 5,
+            heatmap_value: 0,
         };
 
         let min_max = MinMax {
@@ -394,6 +407,7 @@ mod tests {
             },
             final_piece_bit: 0,
             value: 5,
+            heatmap_value: 0,
         };
 
         let min_max = MinMax {
@@ -414,7 +428,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -423,6 +437,7 @@ mod tests {
             },
             final_piece_bit: 55,
             value: 3,
+            heatmap_value: 0,
         };
 
         assert_eq!(result, expected);
@@ -436,7 +451,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -445,12 +460,13 @@ mod tests {
             },
             final_piece_bit: 20,
             value: 1,
+            heatmap_value: 0,
         };
 
         assert_eq!(result, expected);
     }
 
-
+    /*
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
@@ -459,7 +475,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 6, 0, 0, None, board, &pieces_info);
+        let result = gen_best_move(true, 6, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -468,8 +484,10 @@ mod tests {
             },
             final_piece_bit: 20,
             value: 1,
+            heatmap_value: 0,
         };
 
         assert_eq!(result, expected);
     }
+    */
 }

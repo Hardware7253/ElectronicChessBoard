@@ -743,20 +743,6 @@ pub mod move_generator {
 
                                     match new_checking_piece {
                                         Some(piece) => {
-
-                                            /*
-                                            // Update board
-                                            let mut board = *board;
-                                            board.board[board_index] ^= 1 << initial_bit | 1 << final_bit;
-                                            board.board[checking_piece.board_index] ^= 1 << checking_piece.bit;
-
-                                            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, pieces_info);
-
-                                            let mate = is_mate(king, &enemy_attacks, team_bitboards, &board, pieces_info);
-                                            println!("d");
-                                            return mate;
-                                            */
-
                                             // If there is a new checking piece then the move put the king into check, so it is still mate
                                             continue;
                                         },
@@ -935,11 +921,14 @@ pub mod move_generator {
         }
 
         // If a piece was captured with en passant its value is 1
-        match piece_moves.en_passant_capture_bit {
-            Some(_) => value = 1,
-            None => (),
+        // Don't set value to 1 if piece castled, because en_passant_capture_bit is also set when castled = true
+        if !castled {
+            match piece_moves.en_passant_capture_bit {
+                Some(_) => value = 1,
+                None => (),
+            }
         }
-
+        
         // Don't keep en passant target from the piece moves if the pawn didn't move 2 squares
         if (piece_move_bit as i8 - piece.bit as i8).abs() != 16 {
             board.en_passant_target = None;

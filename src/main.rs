@@ -91,7 +91,7 @@ fn main() {
             }
         } else {
             // Get ai piece move if it is not the players turn
-            piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, board, &pieces_info);
+            piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, &opening_heatmap, board, &pieces_info);
         }
 
         // Get friendly and enemy kings
