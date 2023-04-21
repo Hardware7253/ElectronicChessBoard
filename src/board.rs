@@ -653,7 +653,6 @@ pub mod move_generator {
 
         let king_can_move = king_can_move(king, enemy_attacks, team_bitboards, pieces_info);
 
-
         if !king_can_move {
 
             // If the king is in double check and the king can't move then it is mate
@@ -703,7 +702,16 @@ pub mod move_generator {
                     // If using checking piece generate the piece attacks
                     // Else generate the piece moves
                     // This is because the attacks are needed to check for checkmate, and moves are needed to check for stalemate
-                    let piece_moves = gen_piece(&piece_coordinates, None, team_bitboards, use_checking_piece, board, pieces_info);
+                    let piece_attacks = gen_piece(&piece_coordinates, None, team_bitboards, use_checking_piece, board, pieces_info);
+
+                    // Pawn moves shouldn't be included in the attacks bitboard
+                    // But they are still necasary for checking if the piece can block a checking pieces path
+                    let pawn_moves_bitboard;
+                    if board_index == 0 || board_index == 6 {
+                        pawn_moves_bitboard = gen_piece(&piece_coordinates, None, team_bitboards, false, board, pieces_info).moves_bitboard;
+                    } else {
+                        pawn_moves_bitboard = 0;
+                    }
 
                     // Get checking piece moves
                     let enemy_team_bitboards = crate::TeamBitboards {
@@ -714,9 +722,9 @@ pub mod move_generator {
                     
                     
                     for final_bit in 0..64 {
-                        if bit_on(piece_moves.moves_bitboard, final_bit) { // true if final_bit can be moved to
+                        if bit_on(piece_attacks.moves_bitboard | pawn_moves_bitboard, final_bit) { // true if final_bit can be moved to
                             if use_checking_piece {
-                                if bit_on(piece_moves.moves_bitboard, checking_piece.bit) && final_bit == checking_piece.bit { // true if the checking piece can be captured
+                                if bit_on(piece_attacks.moves_bitboard, checking_piece.bit) && final_bit == checking_piece.bit { // true if the checking piece can be captured
     
                                     // If the king is not in check after capturing the checking piece then it is not mate
                                     let mut team_bitboards = team_bitboards;
@@ -756,6 +764,13 @@ pub mod move_generator {
                                     };
                                 } else { // If the checking piece cannot be captured, check if its path can be blocked
                                     if bit_on(checking_piece_moves, final_bit) { // True if the friendly piece moved into the checking pieces path
+                                        
+                                        // If the current piece is a pawn and the the current move isn't also on it's move bitboard then the move isn't valid
+                                        if board_index == 0 || board_index == 6 {
+                                            if !bit_on(pawn_moves_bitboard, final_bit) {
+                                                continue;
+                                            }
+                                        }
 
                                         // Update enemy teams bitboard
                                         let mut enemy_team_bitboards = enemy_team_bitboards;
@@ -778,7 +793,7 @@ pub mod move_generator {
                             } else { // Check for stalemate
     
                                 // If the any piece can move then it is not mate
-                                if piece_moves.moves_bitboard > 0 {
+                                if piece_attacks.moves_bitboard > 0 {
                                     return false;
                                 }
                             }
@@ -1446,6 +1461,28 @@ pub mod move_generator {
             let king = BoardCoordinates {
                 board_index: 5,
                 bit: 59,
+            };
+
+            let team_bitboards = TeamBitboards::new(king.board_index, &board);
+
+            let pieces_info = crate::piece::constants::gen();
+
+            let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
+
+            let result = is_mate(&king, &enemy_attacks, team_bitboards, &board, &pieces_info);
+            
+            assert_eq!(result, true);
+        }
+
+        #[test]
+        fn is_mate_test11() {
+            use crate::TeamBitboards;
+
+            let board = fen_decode("1n2k2r/8/2p3pb/1p1pP2p/6bP/2P3Pn/4q2N/1QK5 w - - 0 1", true);
+
+            let king = BoardCoordinates {
+                board_index: 5,
+                bit: 58,
             };
 
             let team_bitboards = TeamBitboards::new(king.board_index, &board);

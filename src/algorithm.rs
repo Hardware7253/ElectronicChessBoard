@@ -116,66 +116,70 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     let mut prune_value: Option<i8> = None;
 
     for i in 0..moves.len() {
-        let initial_piece_coordinates = moves[i].initial_piece_coordinates;
-        let final_piece_bit = moves[i].final_piece_bit;
+        let moves_vec = &moves[i];
+        for j in 0..moves_vec.len() {
+            let initial_piece_coordinates = moves_vec[j].initial_piece_coordinates;
+            let final_piece_bit = moves_vec[j].final_piece_bit;
 
-        let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
-        
-        match new_turn_board {
+            let new_turn_board = move_generator::new_turn(&initial_piece_coordinates, final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+            
+            match new_turn_board {
 
-            // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
-            Ok(new_board) => {
-                let mut move_value = new_board.points_delta;
-                
-                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
-                if !master_team {
-                    move_value *= -1;
-                }
+                // Only continue searching down the move tree if the move didn't result in an invalid move or the end of the game
+                Ok(new_board) => {
+                    let mut move_value = new_board.points_delta;
+                    
+                    // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                    if !master_team {
+                        move_value *= -1;
+                    }
 
-                let branch_value = init_value + move_value;
+                    let branch_value = init_value + move_value;
 
-                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, new_board, pieces_info);
-                let piece_move = Move {
-                    initial_piece_coordinates: initial_piece_coordinates,
-                    final_piece_bit: final_piece_bit,
-                    value: piece_move.value,
-                };
-                
-                min_max = update_min_max(piece_move, min_max);
-                prune_value = update_prune_value(master_team, &min_max);
-            },
-            Err(error) => {
-
-                // Update min_max with value of game ending if the game ended
-                let mut branch_value;
-                let valid_move;
-
-                match error {
-                    TurnError::Win => {branch_value = 127; valid_move = true},
-                    TurnError::Draw => {branch_value = 0; valid_move = true},
-                    TurnError::InvalidMove => {branch_value = 0; valid_move = false},
-                    TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
-                }
-
-                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
-                if !master_team {
-                    branch_value *= -1;
-                }
-
-                if valid_move {
+                    let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, new_board, pieces_info);
                     let piece_move = Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_piece_bit,
-                        value: branch_value,
+                        value: piece_move.value,
                     };
-
+                    
                     min_max = update_min_max(piece_move, min_max);
                     prune_value = update_prune_value(master_team, &min_max);
-                }
+                },
+                Err(error) => {
 
-                continue;
-            },
+                    // Update min_max with value of game ending if the game ended
+                    let mut branch_value;
+                    let valid_move;
+
+                    match error {
+                        TurnError::Win => {branch_value = 127; valid_move = true},
+                        TurnError::Draw => {branch_value = 0; valid_move = true},
+                        TurnError::InvalidMove => {branch_value = 0; valid_move = false},
+                        TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
+                    }
+
+                    // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                    if !master_team {
+                        branch_value *= -1;
+                    }
+
+                    if valid_move {
+                        let piece_move = Move {
+                            initial_piece_coordinates: initial_piece_coordinates,
+                            final_piece_bit: final_piece_bit,
+                            value: branch_value,
+                        };
+
+                        min_max = update_min_max(piece_move, min_max);
+                        prune_value = update_prune_value(master_team, &min_max);
+                    }
+
+                    continue;
+                },
+            }
         }
+        
 
         // Alpha beta pruning
         match parent_value {
@@ -208,6 +212,8 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     if master_team {
         return min_max.max_move.unwrap();
     } else {
+        //println!("{:?}", board);
+        //println!("{:?}", );
         empty_move.value = min_max.min_value.unwrap();
         return empty_move;
     }
@@ -216,10 +222,11 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> [Vec<Move>; 19] {
     use crate::bit_on;
     
-    let mut moves: Vec<Move> = Vec::new();
+    const VEC_NEW: Vec<Move> = Vec::new();
+    let mut moves: [Vec<Move>; 19] = [VEC_NEW; 19];
 
     // Get friendly and enemy board indexes
     let friendly_indexes;
@@ -279,13 +286,13 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                     }
 
                     // Push move to moves vec
-                    moves.push(Move {
+                    moves[(move_value - 7).abs() as usize].push(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
-                        value: move_value,
+                        value: 0,
                     });
                 } else if &initial_piece_coordinates == friendly_king { // Add potentially invalid king moves to moves vec to account for castling
-                    moves.push(Move {
+                    moves[7].push(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: 0,
@@ -297,7 +304,7 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
 
     // Sort moves and return
     if sort {
-        moves.sort_by(|a, b| b.value.cmp(&a.value));
+        //moves.sort_by(|a, b| b.value.cmp(&a.value));
     }
     moves
 }
@@ -332,10 +339,10 @@ mod tests {
                 bit: 43,
             },
             final_piece_bit: 36,
-            value: 5,
+            value: 0,
         };
 
-        assert_eq!(result[0], best_move);
+        assert_eq!(result[2][0], best_move);
     }
 
     #[test]
@@ -443,7 +450,7 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    /*
+
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
@@ -465,5 +472,4 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-    */
 }
