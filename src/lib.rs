@@ -1,6 +1,7 @@
 pub mod board;
 pub mod piece;
 pub mod algorithm;
+pub mod zobrist;
 
 // Convert a char of a number to an integer
 // E.g. '1' -> 1

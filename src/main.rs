@@ -1,12 +1,13 @@
+extern crate rand;
+use rand::thread_rng;
+use rand::Rng;
+
 use std::io;
 use chess2::board::board_representation;
 use chess2::algorithm::Move;
 use chess2::board::move_generator;
 use chess2::board::move_generator::TurnError;
-
-extern crate rand;
-use rand::thread_rng;
-use rand::Rng;
+use chess2::zobrist;
 
 fn main() {
     
@@ -31,9 +32,11 @@ fn main() {
     ];
 
     // Choose random opening heatmap to affect which squares the ai views as advantageous during the early game
-    let mut rng = thread_rng();
-    let heatmap: usize = rng.gen_range(0, 6);
+    let heatmap: usize = thread_rng().gen_range(0, 6);
     let opening_heatmap = opening_heatmaps[heatmap];
+
+    // Generate bitstrings array for zobrist hashing
+    let bitstrings_array = zobrist::gen_bitstrings_array();
 
     // Debug
     let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
