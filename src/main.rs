@@ -1,13 +1,15 @@
 extern crate rand;
 use rand::thread_rng;
 use rand::Rng;
-
 use std::io;
+use std::collections::HashMap;
+
 use chess2::board::board_representation;
 use chess2::algorithm::Move;
 use chess2::board::move_generator;
 use chess2::board::move_generator::TurnError;
 use chess2::zobrist;
+
 
 fn main() {
     
@@ -38,13 +40,15 @@ fn main() {
     // Generate bitstrings array for zobrist hashing
     let bitstrings_array = zobrist::gen_bitstrings_array();
 
+    let mut transpositions = HashMap::new();
+
     // Debug
     let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
     println!("{:?}", board.board);
 
     let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    bug_board.board = [2621440, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    //bug_board.board = [75316814938112, 0, 36028797018963968, 0, 144115188075855872, 288230376151711744, 2319712256, 128, 140737488355330, 274886295552, 4503599627370496, 16, 18446744073709551615];
+    //bug_board.board = [2621440, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    bug_board.board = [0, 36028797018963968, 0, 0, 0, 1024, 0, 141836999983104, 0, 0, 0, 128, 18446744073709551615];
 
     let bug_board_fen_encode = board_representation::fen_encode(&bug_board);
     println!("{}", bug_board_fen_encode);
@@ -64,10 +68,7 @@ fn main() {
         println!("{:?}", board);
         println!("");
 
-        if board.turns_since_capture == 50 {
-            println!("Draw, too many moves since last capture");
-            break;
-        }
+        let half_move_clock = board.half_move_clock;
 
         let player_turn = player_white == board.whites_move;
 
@@ -94,7 +95,7 @@ fn main() {
             }
         } else {
             // Get ai piece move if it is not the players turn
-            piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, &opening_heatmap, board, &pieces_info);
+            piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, &opening_heatmap, &bitstrings_array, false, &mut transpositions, board, &pieces_info);
         }
 
         // Get friendly and enemy kings
@@ -167,6 +168,12 @@ fn main() {
                     TurnError::InvalidMoveCheck => {println!("Invalid move, the king is in check"); continue}
                 }
             },
+        }
+        // Draw game based on half move clock after the move has taken place
+        // This is so checkmates made this move take priority over the half move draw
+        if half_move_clock == 100 {
+            println!("Draw, too many consecutive moves without capture or pawn move");
+            break;
         }
     }
 }

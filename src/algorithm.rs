@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::board::board_representation;
 use crate::board::move_generator::EnemyAttacks;
 use crate::TeamBitboards;
@@ -27,7 +29,7 @@ impl Move {
 #[derive(Copy, Clone, PartialEq, Debug)]
 struct MinMax {
     max_move: Option<Move>,
-    min_value: Option<i8>,
+    min_move: Option<Move>,
 }
 
 // Update MinMax struct if new move has a value lesser or greater than min/max fields
@@ -40,23 +42,24 @@ fn update_min_max(piece_move: Move, mut min_max: MinMax) -> MinMax {
             // If min_max has not yet been initialized then initialize it with piece_move
             return MinMax {
                 max_move: Some(piece_move),
-                min_value: Some(piece_move.value),
+                min_move: Some(piece_move),
             };
         },
     }
 
     let max_value = min_max.max_move.unwrap().value;
-    let min_value = min_max.min_value.unwrap();
+    let min_value = min_max.min_move.unwrap().value;
 
     if piece_move.value > max_value {
         min_max.max_move = Some(piece_move);
     } else if piece_move.value < min_value {
-        min_max.min_value = Some(piece_move.value);
+        min_max.min_move = Some(piece_move);
     }
 
     min_max
 }
 
+// Returns min/max value needed for alpha beta pruning depending on the master team
 fn update_prune_value(master_team: bool, min_max: &MinMax) -> Option<i8> {
     if master_team {
         match min_max.max_move {
@@ -64,13 +67,45 @@ fn update_prune_value(master_team: bool, min_max: &MinMax) -> Option<i8> {
             None => return None,
         }
     } else {
-        return min_max.min_value;
+        match min_max.min_move {
+            Some(min_move) => return Some(min_move.value),
+            None => return None,
+        }
     }
 }
 
-pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usize, init_value: i8, parent_value: Option<i8>, opening_heatmap: &[[u16; 64]; 12], board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Move {
+pub fn gen_best_move(
+    master_team: bool,
+    search_depth: usize,
+    current_depth: usize,
+    init_value: i8,
+    parent_value: Option<i8>,
+    opening_heatmap: &[[u16; 64]; 12],
+    zobrist_bitstrings: &[[u64; 64]; 20],
+    disable_transpositions: bool,
+    transpositions: &mut HashMap<u64,crate::zobrist::MoveHash>,
+    board: board_representation::Board,
+    pieces_info: &[crate::piece::constants::PieceInfo; 12]
+) -> Move {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
+    use crate::zobrist;
+
+    // Read transposition table to see if this board has all ready been evaluated at this depth
+    let board_hash = zobrist::hash_board(&board, zobrist_bitstrings);
+    let transposition = transpositions.get(&board_hash).copied();
+
+    if !disable_transpositions {
+        match transposition {
+            Some(move_hash) => {
+                if move_hash.move_depth >= current_depth {
+                    return move_hash.move_struct;
+                }
+            }
+            None => (),
+        };
+    }
+    
 
     let mut empty_move = Move::new();
 
@@ -112,7 +147,7 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 
     let mut min_max = MinMax {
         max_move: None,
-        min_value: None,
+        min_move: None,
     };
 
     let mut prune_value: Option<i8> = None;
@@ -136,7 +171,19 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
 
                 let branch_value = init_value + move_value;
 
-                let piece_move = gen_best_move(!master_team, search_depth, current_depth + 1, branch_value, prune_value, opening_heatmap, new_board, pieces_info);
+                let piece_move = gen_best_move(
+                    !master_team, search_depth,
+                    current_depth + 1,
+                    branch_value,
+                    prune_value,
+                    opening_heatmap,
+                    zobrist_bitstrings,
+                    disable_transpositions,
+                    transpositions,
+                    new_board,
+                    pieces_info
+                );
+
                 let piece_move = Move {
                     initial_piece_coordinates: initial_piece_coordinates,
                     final_piece_bit: final_piece_bit,
@@ -194,9 +241,9 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
                         None => (),
                     }
                 } else {
-                    match min_max.min_value {
-                        Some(min_value) => {
-                            if min_value <= value {
+                    match min_max.min_move {
+                        Some(min_move) => {
+                            if min_move.value >= value {
                                 break;
                             }
                         },
@@ -209,12 +256,27 @@ pub fn gen_best_move(master_team: bool, search_depth: usize, current_depth: usiz
     }
 
     // Return min/max values depending on the team
+    let return_move;
     if master_team {
-        return min_max.max_move.unwrap();
+        return_move = min_max.max_move.unwrap();
     } else {
-        empty_move.value = min_max.min_value.unwrap();
-        return empty_move;
+        return_move = min_max.min_move.unwrap();
     }
+
+    // Add move to transpositions hashmap
+    let move_hash = zobrist::MoveHash {
+        move_struct: return_move,
+        move_depth: current_depth,
+    };
+    transpositions.insert(board_hash, move_hash);
+
+    if return_move.value == 8 {
+        //println!("{:?}", board.board);
+        //[0, 2251799813685248, 0, 0, 0, 1024, 0, 9895604649984, 36028797018963968, 0, 0, 128, 18446744073709551615]
+        //[0, 36028797018963968, 0, 0, 0, 1024, 0, 141836999983104, 0, 0, 0, 128, 18446744073709551615]
+    }
+    
+    return_move
 }
 
 // Returns a vec with potential moves
@@ -360,7 +422,7 @@ mod tests {
     fn update_min_max_test() {
         use crate::board::board_representation;
 
-        let max_move = Move {
+        let move1 = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
                 board_index: 0,
                 bit: 43,
@@ -370,7 +432,7 @@ mod tests {
             heatmap_value: 0,
         };
 
-        let piece_move = Move {
+        let move2 = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
                 board_index: 0,
                 bit: 0,
@@ -382,15 +444,15 @@ mod tests {
 
         let min_max = MinMax {
             max_move: None,
-            min_value: None,
+            min_move: None,
         };
 
-        let min_max = update_min_max(max_move, min_max);
-        let min_max = update_min_max(piece_move, min_max);
+        let min_max = update_min_max(move1, min_max);
+        let min_max = update_min_max(move2, min_max);
 
         let expected = MinMax {
-            max_move: Some(piece_move),
-            min_value: Some(3),
+            max_move: Some(move2),
+            min_move: Some(move1),
         };
 
         assert_eq!(min_max, expected);
@@ -412,7 +474,7 @@ mod tests {
 
         let min_max = MinMax {
             max_move: Some(piece_move),
-            min_value: Some(3),
+            min_move: Some(piece_move),
         };
 
         let result = update_prune_value(true, &min_max);
@@ -428,7 +490,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -451,7 +513,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {

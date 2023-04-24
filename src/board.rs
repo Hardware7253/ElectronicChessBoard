@@ -29,7 +29,8 @@ pub mod board_representation {
         pub whites_move: bool, 
         pub points: Points, // White and black team points
         pub points_delta: i8, // Change in points for team after the last move
-        pub turns_since_capture: u8,
+        pub half_moves: u16, // The total number of half moves
+        pub half_move_clock: u8, // The number of half moves since the last capture or pawn move
         pub en_passant_target: Option<usize>, // En passant target bit
     }
 
@@ -63,7 +64,8 @@ pub mod board_representation {
                     black_points: 0,
                 },
                 points_delta: 0,
-                turns_since_capture: 0,
+                half_moves: 0,
+                half_move_clock: 0,
                 en_passant_target: None,
             }
         }
@@ -153,8 +155,8 @@ pub mod board_representation {
 
             // Set turns since last capture
             if spaces == 4 {
-                board.turns_since_capture *= 10;
-                board.turns_since_capture += char_num as u8;
+                board.half_move_clock *= 10;
+                board.half_move_clock += char_num as u8;
             }
 
             // Ignore the rest of the fen code
@@ -276,7 +278,7 @@ pub mod board_representation {
             expected.en_passant_target = Some(44);
 
             // Half moves
-            expected.turns_since_capture = 50;
+            expected.half_move_clock = 50;
 
 
             assert_eq!(board, expected);
@@ -315,7 +317,14 @@ pub mod move_generator {
         }
     }
 
-    pub fn gen_piece(piece: &board_representation::BoardCoordinates, enemy_king: Option<&board_representation::BoardCoordinates>, team_bitboards: crate::TeamBitboards, only_gen_attacks: bool, board: &board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Moves {
+    pub fn gen_piece(
+        piece: &board_representation::BoardCoordinates,
+        enemy_king: Option<&board_representation::BoardCoordinates>,
+        team_bitboards: crate::TeamBitboards,
+        only_gen_attacks: bool,
+        board: &board_representation::Board,
+        pieces_info: &[crate::piece::constants::PieceInfo; 12]
+    ) -> Moves {
         use crate::bit_on;
 
         let piece_info = &pieces_info[piece.board_index];
@@ -805,7 +814,16 @@ pub mod move_generator {
 
     // Move piece to piece_move_bit if the move is valid
     // If move is valid update the board, else return an error
-    pub fn new_turn(piece: &board_representation::BoardCoordinates, piece_move_bit: usize, mut friendly_king: board_representation::BoardCoordinates, enemy_king: &board_representation::BoardCoordinates, enemy_attacks: &EnemyAttacks, mut team_bitboards: crate::TeamBitboards, mut board: board_representation::Board, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Result<board_representation::Board, TurnError> {
+    pub fn new_turn(
+        piece: &board_representation::BoardCoordinates,
+        piece_move_bit: usize,
+        mut friendly_king: board_representation::BoardCoordinates,
+        enemy_king: &board_representation::BoardCoordinates,
+        enemy_attacks: &EnemyAttacks,
+        mut team_bitboards: crate::TeamBitboards,
+        mut board: board_representation::Board,
+        pieces_info: &[crate::piece::constants::PieceInfo; 12]
+    ) -> Result<board_representation::Board, TurnError> {
         use crate::TeamBitboards;
         use crate::board_index_white;
 
@@ -934,12 +952,16 @@ pub mod move_generator {
             board.en_passant_target = None;
         }
 
-        if value == 0 {
-            board.turns_since_capture += 1;
+        // Increment half move clock if no capture was made and a pawn did not move, otherwise reset the half move clock
+        if value == 0 && !(piece.board_index == 0 || piece.board_index == 6) {
+            board.half_move_clock += 1;
         } else {
-            board.turns_since_capture = 0;
+            board.half_move_clock = 0;
             team_bitboards.enemy_team ^= 1 << piece_move_bit; // Remove captured piece from enemy team bitboard
         }
+
+        // Increment total half moves
+        board.half_moves += 1;
 
         // If the king is in check after the move return an error
         let enemy_attacks = gen_enemy_attacks(&friendly_king, team_bitboards, &board, pieces_info);
@@ -1520,6 +1542,7 @@ pub mod move_generator {
             expected_board.points.white_points = 9;
             expected_board.points_delta = 9;
             expected_board.board[12] |= 1 << 29;
+            expected_board.half_moves = 1;
 
             assert_eq!(new_turn_board, Ok(expected_board));            
         }
@@ -1588,7 +1611,8 @@ pub mod move_generator {
             let new_turn_board = new_turn(&piece, 6, king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
 
             expected_board.board[12] |= 1 << 6;
-            expected_board.turns_since_capture += 1;
+            expected_board.half_move_clock += 1;
+            expected_board.half_moves = 1;
 
             assert_eq!(new_turn_board, Ok(expected_board));            
         }
@@ -1752,8 +1776,8 @@ pub mod move_generator {
 
             let mut expected_board = fen_decode("rnbqkbnr/pppp1ppp/8/4p3/P7/8/1PPPPPPP/RNBQKBNR w - - 0 1", true);
             expected_board.board[12] = 18375249429624979711;
-            expected_board.turns_since_capture += 1;
             expected_board.en_passant_target = Some(20);
+            expected_board.half_moves = 1;
 
             assert_eq!(new_turn_board, Ok(expected_board));            
         }
@@ -1791,6 +1815,7 @@ pub mod move_generator {
             expected_board.board[12] |= 1 << 54;
             expected_board.points_delta = 1;
             expected_board.points.black_points = 1;
+            expected_board.half_moves = 1;
 
             assert_eq!(new_turn_board, Ok(expected_board));            
         }

@@ -2,6 +2,12 @@ extern crate rand;
 use rand::thread_rng;
 use rand::Rng;
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct MoveHash {
+    pub move_struct: crate::algorithm::Move, // Move
+    pub move_depth: usize, // The search depth that the move was evaluated from
+}
+
 // Indexes for pieces in bitstrings array
     // Moves = 1
         // White pawn = 0
@@ -85,13 +91,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_board_test() {
+    fn hash_board_test1() {
         use crate::board::board_representation;
     
         let bitstrings_array = gen_bitstrings_array();
 
         let board1 = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
         let board2 = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Qkq - 0 1", true);
+
+        let board1_hash = hash_board(&board1, &bitstrings_array);
+        let board2_hash = hash_board(&board2, &bitstrings_array);
+
+        assert_ne!(board1_hash, board2_hash);
+    }
+
+    #[test]
+    fn hash_board_test2() {
+        use crate::board::board_representation;
+    
+        let bitstrings_array = gen_bitstrings_array();
+
+        let board1 = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
+        let board2 = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1", true);
 
         let board1_hash = hash_board(&board1, &bitstrings_array);
         let board2_hash = hash_board(&board2, &bitstrings_array);
