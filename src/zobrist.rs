@@ -6,6 +6,7 @@ use rand::Rng;
 pub struct MoveHash {
     pub move_struct: crate::algorithm::Move, // Move
     pub move_depth: usize, // The search depth that the move was evaluated from
+    pub half_move: i16, // The half move that the move was evaluated from
 }
 
 // Indexes for pieces in bitstrings array

@@ -40,15 +40,15 @@ fn main() {
     // Generate bitstrings array for zobrist hashing
     let bitstrings_array = zobrist::gen_bitstrings_array();
 
-    let mut transpositions = HashMap::new();
+    let mut transpositions: HashMap<u64,chess2::zobrist::MoveHash> = HashMap::new();
 
     // Debug
     let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
     println!("{:?}", board.board);
 
     let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    //bug_board.board = [2621440, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    bug_board.board = [0, 36028797018963968, 0, 0, 0, 1024, 0, 141836999983104, 0, 0, 0, 128, 18446744073709551615];
+    bug_board.board = [2260630401189888, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    //bug_board.board = [64176303279964160, 2305860601399738368, 4398314946560, 139264, 2251799813685248, 4611686018427387904, 2181300224, 1, 134217728, 4100, 16, 8, 18382567779019522047];
 
     let bug_board_fen_encode = board_representation::fen_encode(&bug_board);
     println!("{}", bug_board_fen_encode);
@@ -94,6 +94,10 @@ fn main() {
                 }
             }
         } else {
+            // Only keep moves in the transposition table that are atleast current with the board half moves
+            // This removed old moves as they are less likely to be used than newer ones
+            transpositions.retain(|_, v| v.half_move >= board.half_moves);
+
             // Get ai piece move if it is not the players turn
             piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, &opening_heatmap, &bitstrings_array, false, &mut transpositions, board, &pieces_info);
         }

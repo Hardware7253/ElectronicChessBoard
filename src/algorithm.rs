@@ -267,14 +267,9 @@ pub fn gen_best_move(
     let move_hash = zobrist::MoveHash {
         move_struct: return_move,
         move_depth: current_depth,
+        half_move: board.half_moves,
     };
     transpositions.insert(board_hash, move_hash);
-
-    if return_move.value == 8 {
-        //println!("{:?}", board.board);
-        //[0, 2251799813685248, 0, 0, 0, 1024, 0, 9895604649984, 36028797018963968, 0, 0, 128, 18446744073709551615]
-        //[0, 36028797018963968, 0, 0, 0, 1024, 0, 141836999983104, 0, 0, 0, 128, 18446744073709551615]
-    }
     
     return_move
 }
@@ -533,11 +528,11 @@ mod tests {
     fn gen_best_move_test3() {
         use crate::board::board_representation;
 
-        let board = board_representation::fen_decode("1nb1kb1r/8/2p3p1/1p1pP2p/7P/2P3Pn/4Bq1N/Q2K4 b - - 0 1", true);
+        let board = board_representation::fen_decode("r1bq4/3kbB2/2p5/1p1n3p/1P1B4/2N1RN2/2PQ1PPP/5RK1 b - - 0 1", true);
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 6, 0, 0, None, &[[0u16; 64]; 12], board, &pieces_info);
+        let result = gen_best_move(true, 5, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
