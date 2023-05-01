@@ -798,9 +798,6 @@ pub mod move_generator {
 
                                             // Get squares that could potentially be putting the king in check afer the move
                                             let king_check_squares = gen_piece(&sliding_king, None, team_bitboards, false, board, pieces_info);
-
-                                            //println!("{:?}", team_bitboards);
-                                            //println!("{:?}", king_check_squares);
                                             
                                             // Loop through every king_check_square to check for enemy pieces
                                             // Generate moves from enemy pieces to see if any are putting the king in check
@@ -816,9 +813,6 @@ pub mod move_generator {
                                                                 board_index: j,
                                                                 bit: i,
                                                             };
-
-                                                            println!("{}, {}", initial_bit, final_bit);
-                                                            println!("{:?}", checking_piece);
 
                                                             let enemy_team_bitboards = crate::TeamBitboards {
                                                                 friendly_team: team_bitboards.enemy_team,

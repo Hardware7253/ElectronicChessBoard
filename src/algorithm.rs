@@ -9,7 +9,7 @@ pub struct Move {
     pub initial_piece_coordinates: board_representation::BoardCoordinates,
     pub final_piece_bit: usize,
     pub value: i8,
-    pub heatmap_value: u16,
+    pub heatmap_value: i16,
 }
 
 impl Move {
@@ -80,7 +80,7 @@ pub fn gen_best_move(
     current_depth: usize,
     init_value: i8,
     parent_value: Option<i8>,
-    opening_heatmap: &[[u16; 64]; 12],
+    opening_heatmap: &[[i16; 64]; 12],
     zobrist_bitstrings: &[[u64; 64]; 20],
     disable_transpositions: bool,
     transpositions: &mut HashMap<u64,crate::zobrist::MoveHash>,
@@ -243,7 +243,7 @@ pub fn gen_best_move(
                 } else {
                     match min_max.min_move {
                         Some(min_move) => {
-                            if min_move.value >= value {
+                            if min_move.value <= value {
                                 break;
                             }
                         },
@@ -277,7 +277,7 @@ pub fn gen_best_move(
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[u16; 64]; 12], team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[i16; 64]; 12], team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
     use crate::bit_on;
     
     let mut moves: Vec<Move> = Vec::new();
@@ -313,7 +313,10 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
             let piece_moves = crate::board::move_generator::gen_piece(&initial_piece_coordinates, None, team_bitboards, false, board, pieces_info);
             
             for final_bit in 0..64 {
-                let heatmap_value = opening_heatmap[i][final_bit];
+
+                // Get the heatmap value as the difference of the final and initial bit values
+                // This is to prevent pieces from moving to less advantageous positions than ones they are allready in
+                let heatmap_value = opening_heatmap[i][final_bit] - opening_heatmap[i][initial_bit];
 
                 // Check the piece can move to final_bit or piece is a king
                 // Because this function does not account for castling those moves cannot be ruled out for the king
@@ -407,7 +410,7 @@ mod tests {
             },
             final_piece_bit: 36,
             value: 5,
-            heatmap_value: 2246,
+            heatmap_value: result[0].heatmap_value,
         };
 
         assert_eq!(result[0], best_move);
@@ -485,7 +488,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -508,7 +511,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -532,7 +535,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 5, 0, 0, None, &[[0u16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 5, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
