@@ -525,7 +525,7 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-
+    
     /*
     #[test]
     fn gen_best_move_test3() {
@@ -535,7 +535,8 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 5, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let bitstrings_array = crate::zobrist::gen_bitstrings_array();
+        let result = gen_best_move(true, 6, 0, 0, None, &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
