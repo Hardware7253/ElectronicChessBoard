@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use crate::board::board_representation;
 use crate::board::move_generator::EnemyAttacks;
@@ -143,7 +144,26 @@ pub fn gen_best_move(
     let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, pieces_info);
 
     // Generate moves
-    let moves = &order_moves(true, &board, &enemy_attacks, &friendly_king, opening_heatmap, team_bitboards, pieces_info);
+    let moves = &mut order_moves(true, &board, &enemy_attacks, &friendly_king, opening_heatmap, &team_bitboards, pieces_info);
+
+    // Add pv move from lower search depth to the start of moves to increase alpha beta cuttoffs
+    // Iterative deepening
+    if current_depth == 0 && search_depth > 1 {
+        let pv_move = gen_best_move(
+            true, 
+            search_depth - 1,
+            0,
+            0,
+            None,
+            opening_heatmap,
+            zobrist_bitstrings,
+            true,
+            &mut HashMap::new(),
+            board,
+            pieces_info
+        );
+        moves.push_front(pv_move);
+    }
 
     let mut min_max = MinMax {
         max_move: None,
@@ -172,7 +192,8 @@ pub fn gen_best_move(
                 let branch_value = init_value + move_value;
 
                 let piece_move = gen_best_move(
-                    !master_team, search_depth,
+                    !master_team, 
+                    search_depth,
                     current_depth + 1,
                     branch_value,
                     prune_value,
@@ -277,10 +298,10 @@ pub fn gen_best_move(
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[i16; 64]; 12], team_bitboards: crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> Vec<Move> {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[i16; 64]; 12], team_bitboards: &crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> VecDeque<Move> {
     use crate::bit_on;
     
-    let mut moves: Vec<Move> = Vec::new();
+    let mut moves: VecDeque<Move> = VecDeque::new();
 
     // Get friendly and enemy board indexes
     let friendly_indexes;
@@ -344,14 +365,14 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                     }
 
                     // Push move to moves vec
-                    moves.push(Move {
+                    moves.push_back(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: move_value,
                         heatmap_value: heatmap_value,
                     });
                 } else if &initial_piece_coordinates == friendly_king { // Add potentially invalid king moves to moves vec to account for castling
-                    moves.push(Move {
+                    moves.push_back(Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: 0,
@@ -368,7 +389,10 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
         // Sort moves by value first
         // Sort moves by heatmap_value if they have the same value
         // https://stackoverflow.com/questions/70193935/how-to-sort-a-vec-of-structs-by-2-or-multiple-fields
-        moves.sort_by(| a, b | if a.value == b.value {
+        // https://stackoverflow.com/questions/74873575/how-to-sort-or-reverse-vecdeque-without-make-contiguous
+
+        moves.rotate_right(moves.as_slices().1.len());
+        moves.as_mut_slices().0.sort_by(| a, b | if a.value == b.value {
             b.heatmap_value.partial_cmp(&a.heatmap_value).unwrap()
         } else {
             b.value.partial_cmp(&a.value).unwrap()
@@ -401,7 +425,7 @@ mod tests {
 
         let enemy_attacks = move_generator::gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
 
-        let result = order_moves(true, &board, &enemy_attacks, &king, &opening_heatmap, team_bitboards, &pieces_info);
+        let result = order_moves(true, &board, &enemy_attacks, &king, &opening_heatmap, &team_bitboards, &pieces_info);
 
         let best_move = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {

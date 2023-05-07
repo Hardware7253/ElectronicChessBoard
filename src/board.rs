@@ -323,7 +323,7 @@ pub mod move_generator {
     pub fn gen_piece(
         piece: &board_representation::BoardCoordinates,
         enemy_king: Option<&board_representation::BoardCoordinates>,
-        team_bitboards: crate::TeamBitboards,
+        team_bitboards: &crate::TeamBitboards,
         only_gen_attacks: bool,
         board: &board_representation::Board,
         pieces_info: &[crate::piece::constants::PieceInfo; 12]
@@ -343,7 +343,7 @@ pub mod move_generator {
 
         // Initialize moves with pawn capture moves if the piece is a pawn
         if piece_pawn {
-            moves = gen_pawn_captures(&piece, only_gen_attacks, team_bitboards, &board);
+            moves = gen_pawn_captures(&piece, only_gen_attacks, *team_bitboards, &board);
         }
 
         if only_gen_attacks && piece_pawn // Do not generate regular moves for pawns if only_gen_attacks is true
@@ -616,7 +616,7 @@ pub mod move_generator {
                 };
 
                 // Get enemy piece moves (attack moves only) and or them into the enemy moves bitboard
-                let piece_moves = gen_piece(&board_coordinates, Some(king), team_bitboards, true, board, pieces_info);
+                let piece_moves = gen_piece(&board_coordinates, Some(king), &team_bitboards, true, board, pieces_info);
                 enemy_attack_bitboard |= piece_moves.moves_bitboard;
 
                 // If an enemy attack and king are in the same bit then the king is put in check by that piece
@@ -715,13 +715,13 @@ pub mod move_generator {
                     // If using checking piece generate the piece attacks
                     // Else generate the piece moves
                     // This is because the attacks are needed to check for checkmate, and moves are needed to check for stalemate
-                    let piece_attacks = gen_piece(&piece_coordinates, None, team_bitboards, use_checking_piece, board, pieces_info);
+                    let piece_attacks = gen_piece(&piece_coordinates, None, &team_bitboards, use_checking_piece, board, pieces_info);
 
                     // Pawn moves shouldn't be included in the attacks bitboard
                     // But they are still necasary for checking if the piece can block a checking pieces path
                     let pawn_moves_bitboard;
                     if board_index == 0 || board_index == 6 {
-                        pawn_moves_bitboard = gen_piece(&piece_coordinates, None, team_bitboards, false, board, pieces_info).moves_bitboard;
+                        pawn_moves_bitboard = gen_piece(&piece_coordinates, None, &team_bitboards, false, board, pieces_info).moves_bitboard;
                     } else {
                         pawn_moves_bitboard = 0;
                     }
@@ -731,7 +731,7 @@ pub mod move_generator {
                         friendly_team: team_bitboards.enemy_team,
                         enemy_team: team_bitboards.friendly_team,
                     };  
-                    let checking_piece_attacks = gen_piece(&checking_piece, None, enemy_team_bitboards, true, board, pieces_info).moves_bitboard;
+                    let checking_piece_attacks = gen_piece(&checking_piece, None, &enemy_team_bitboards, true, board, pieces_info).moves_bitboard;
                     
                     
                     for final_bit in 0..64 {
@@ -782,7 +782,7 @@ pub mod move_generator {
                                         enemy_team_bitboards.enemy_team ^= 1 << initial_bit | 1 << final_bit; // Move piece
 
                                         // Get checking piece attacks after the move
-                                        let checking_piece_attacks = gen_piece(&checking_piece, None, enemy_team_bitboards, true, board, pieces_info).moves_bitboard;
+                                        let checking_piece_attacks = gen_piece(&checking_piece, None, &enemy_team_bitboards, true, board, pieces_info).moves_bitboard;
                                         
                                         // True if the original checking piece is no longer putting the king in check
                                         if !bit_on(checking_piece_attacks, king.bit) {
@@ -797,7 +797,7 @@ pub mod move_generator {
                                             };
 
                                             // Get squares that could potentially be putting the king in check afer the move
-                                            let king_check_squares = gen_piece(&sliding_king, None, team_bitboards, false, board, pieces_info);
+                                            let king_check_squares = gen_piece(&sliding_king, None, &team_bitboards, false, board, pieces_info);
                                             
                                             // Loop through every king_check_square to check for enemy pieces
                                             // Generate moves from enemy pieces to see if any are putting the king in check
@@ -820,7 +820,7 @@ pub mod move_generator {
                                                             };
 
                                                             // Get checking piece attacks
-                                                            let checking_piece_attacks = gen_piece(&checking_piece, None, enemy_team_bitboards, true, board, pieces_info);
+                                                            let checking_piece_attacks = gen_piece(&checking_piece, None, &enemy_team_bitboards, true, board, pieces_info);
 
                                                             // If the king is in check after the move then it is mate
                                                             if bit_on(checking_piece_attacks.moves_bitboard, king.bit) {
@@ -912,7 +912,7 @@ pub mod move_generator {
                 board.board[friendly_rook_board_index] ^= 1 << rook_remove_bit | 1 << rook_add_bit;
                 castled = true;
             },
-            None => piece_moves = gen_piece(piece, None, team_bitboards, false, &board, pieces_info), // Gen non castle moves
+            None => piece_moves = gen_piece(piece, None, &team_bitboards, false, &board, pieces_info), // Gen non castle moves
         }
         
         // Return an error if the piece_move bit is not on in the piece_moves bitboard
@@ -1106,7 +1106,7 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let result = gen_piece(&piece, None, team_bitboards, false, &board, &pieces_info);
+            let result = gen_piece(&piece, None, &team_bitboards, false, &board, &pieces_info);
 
             let expected: u64 = 3034431211759470600;
             
@@ -1128,7 +1128,7 @@ pub mod move_generator {
 
             let pieces_info = crate::piece::constants::gen();
 
-            let result = gen_piece(&piece, None, team_bitboards, false, &board, &pieces_info);
+            let result = gen_piece(&piece, None, &team_bitboards, false, &board, &pieces_info);
 
             let expected: u64 = 8830452760576;
             
