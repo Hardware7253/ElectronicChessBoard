@@ -3,8 +3,8 @@ use rand::thread_rng;
 use rand::Rng;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct MoveHash {
-    pub move_struct: crate::algorithm::Move, // Move
+pub struct AlphaBetaHash {
+    pub alpha_beta_struct: crate::algorithm::AlphaBeta, // Alpha beta moves struct
     pub move_depth: usize, // The search depth that the move was evaluated from
     pub half_move: i16, // The half move that the move was evaluated from
 }

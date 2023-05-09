@@ -10,7 +10,7 @@ use chess2::board::move_generator;
 use chess2::board::move_generator::TurnError;
 use chess2::zobrist;
 
-
+/*
 fn main() {
     
     let opening_heatmaps: [[[i16; 64]; 12]; 6] = [
@@ -40,7 +40,7 @@ fn main() {
     // Generate bitstrings array for zobrist hashing
     let bitstrings_array = zobrist::gen_bitstrings_array();
 
-    let mut transpositions: HashMap<u64,chess2::zobrist::MoveHash> = HashMap::new();
+    let mut transpositions: HashMap<u64,chess2::zobrist::AlphaBetaHash> = HashMap::new();
 
     // Debug
     let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
@@ -180,6 +180,11 @@ fn main() {
             break;
         }
     }
+}
+*/
+
+fn main() {
+    
 }
 
 // Get ccn input from user (a2, g4, etc) and convert it into a bitboard bit

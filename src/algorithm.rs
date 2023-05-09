@@ -28,69 +28,64 @@ impl Move {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-struct MinMax {
-    max_move: Option<Move>,
-    min_move: Option<Move>,
+pub struct AlphaBeta {
+    pub alpha: i8,
+    pub beta: i8,
+    pub piece_move: Option<Move>,
 }
 
-// Update MinMax struct if new move has a value lesser or greater than min/max fields
-// Initialize MinMax if it hasn't been allready
-fn update_min_max(piece_move: Move, mut min_max: MinMax) -> MinMax {
-    match min_max.max_move {
-        Some(_) => (),
-        None => {
-
-            // If min_max has not yet been initialized then initialize it with piece_move
-            return MinMax {
-                max_move: Some(piece_move),
-                min_move: Some(piece_move),
-            };
-        },
+impl AlphaBeta {
+    pub fn new() -> Self {
+        AlphaBeta {
+            alpha: i8::MIN, // -Infinity
+            beta: i8::MAX, // +Infinity
+            piece_move: None,
+        }
     }
-
-    let max_value = min_max.max_move.unwrap().value;
-    let min_value = min_max.min_move.unwrap().value;
-
-    if piece_move.value > max_value {
-        min_max.max_move = Some(piece_move);
-    } else if piece_move.value < min_value {
-        min_max.min_move = Some(piece_move);
-    }
-
-    min_max
 }
 
-// Returns min/max value needed for alpha beta pruning depending on the master team
-fn update_prune_value(master_team: bool, min_max: &MinMax) -> Option<i8> {
+// If master team update alpha from child beta
+// If not master team update beta from child alpha
+pub fn update_alpha_beta(my_alpha_beta: &mut AlphaBeta, child_alpha_beta: &AlphaBeta, master_team: bool) {
     if master_team {
-        match min_max.max_move {
-            Some(max_move) => return Some(max_move.value),
-            None => return None,
+        if my_alpha_beta.alpha <= child_alpha_beta.beta {
+            my_alpha_beta.alpha = child_alpha_beta.beta;
+            my_alpha_beta.piece_move = child_alpha_beta.piece_move;
         }
     } else {
-        match min_max.min_move {
-            Some(min_move) => return Some(min_move.value),
-            None => return None,
+        if my_alpha_beta.beta >= child_alpha_beta.alpha {
+            my_alpha_beta.beta = child_alpha_beta.alpha;
+            my_alpha_beta.piece_move = child_alpha_beta.piece_move;
         }
     }
 }
+
 
 pub fn gen_best_move(
     master_team: bool,
     search_depth: usize,
     current_depth: usize,
     init_value: i8,
-    parent_value: Option<i8>,
+    mut alpha_beta: AlphaBeta,
     opening_heatmap: &[[i16; 64]; 12],
     zobrist_bitstrings: &[[u64; 64]; 20],
     disable_transpositions: bool,
-    transpositions: &mut HashMap<u64,crate::zobrist::MoveHash>,
+    transpositions: &mut HashMap<u64,crate::zobrist::AlphaBetaHash>,
     board: board_representation::Board,
     pieces_info: &[crate::piece::constants::PieceInfo; 12]
-) -> Move {
+) -> AlphaBeta {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
     use crate::zobrist;
+
+    // If current depth and search depth are equal stop searching down the move tree
+    if current_depth == search_depth {
+        return AlphaBeta {
+            alpha: init_value,
+            beta: init_value,
+            piece_move: None,
+        };
+    }
 
     // Read transposition table to see if this board has all ready been evaluated at this depth
     let board_hash = zobrist::hash_board(&board, zobrist_bitstrings);
@@ -98,22 +93,13 @@ pub fn gen_best_move(
 
     if !disable_transpositions {
         match transposition {
-            Some(move_hash) => {
-                if move_hash.move_depth >= current_depth {
-                    return move_hash.move_struct;
+            Some(alpha_beta_hash) => {
+                if alpha_beta_hash.move_depth >= current_depth {
+                    return alpha_beta_hash.alpha_beta_struct;
                 }
             }
             None => (),
         };
-    }
-    
-
-    let mut empty_move = Move::new();
-
-    // If current depth and search depth are equal stop searching down the move tree
-    if current_depth == search_depth {
-        empty_move.value = init_value;
-        return empty_move;
     }
 
     // Get friendly and enemy team BoardCoordinates
@@ -154,23 +140,16 @@ pub fn gen_best_move(
             search_depth - 1,
             0,
             0,
-            None,
+            AlphaBeta::new(),
             opening_heatmap,
             zobrist_bitstrings,
             true,
             &mut HashMap::new(),
             board,
             pieces_info
-        );
+        ).piece_move.unwrap();
         moves.push_front(pv_move);
     }
-
-    let mut min_max = MinMax {
-        max_move: None,
-        min_move: None,
-    };
-
-    let mut prune_value: Option<i8> = None;
 
     for i in 0..moves.len() {
         let initial_piece_coordinates = moves[i].initial_piece_coordinates;
@@ -191,12 +170,12 @@ pub fn gen_best_move(
 
                 let branch_value = init_value + move_value;
 
-                let piece_move = gen_best_move(
+                let mut child_alpha_beta = gen_best_move(
                     !master_team, 
                     search_depth,
                     current_depth + 1,
                     branch_value,
-                    prune_value,
+                    alpha_beta,
                     opening_heatmap,
                     zobrist_bitstrings,
                     disable_transpositions,
@@ -208,91 +187,69 @@ pub fn gen_best_move(
                 let piece_move = Move {
                     initial_piece_coordinates: initial_piece_coordinates,
                     final_piece_bit: final_piece_bit,
-                    value: piece_move.value,
+                    value: 0,
                     heatmap_value: 0,
                 };
-                
-                min_max = update_min_max(piece_move, min_max);
-                prune_value = update_prune_value(master_team, &min_max);
+
+                child_alpha_beta.piece_move = Some(piece_move);
+
+                update_alpha_beta(&mut alpha_beta, &child_alpha_beta, master_team);
             },
             Err(error) => {
 
-                // Update min_max with value of game ending if the game ended
+                // Update alpha/beta with value of game ending if the game ended
                 let mut branch_value;
-                let valid_move;
+                let mut valid_move;
 
                 match error {
-                    TurnError::Win => {branch_value = 127; valid_move = true},
+                    TurnError::Win => {branch_value = i8::MAX; valid_move = true},
                     TurnError::Draw => {branch_value = 0; valid_move = true},
                     TurnError::InvalidMove => {branch_value = 0; valid_move = false},
                     TurnError::InvalidMoveCheck => {branch_value = 0; valid_move = false},
                 }
 
-                // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
-                if !master_team {
-                    branch_value *= -1;
-                }
-
                 if valid_move {
+                    // If the current branch is not the master team then it's move values are negative (because they negatively impact the master team)
+                    if !master_team {
+                        branch_value *= -1;
+                    }
+
                     let piece_move = Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_piece_bit,
-                        value: branch_value,
+                        value: 0,
                         heatmap_value: 0,
                     };
 
-                    min_max = update_min_max(piece_move, min_max);
-                    prune_value = update_prune_value(master_team, &min_max);
-                }
+                    let child_alpha_beta = AlphaBeta {
+                        alpha: branch_value,
+                        beta: branch_value,
+                        piece_move: Some(piece_move),
+                    };
 
-                continue;
+                    update_alpha_beta(&mut alpha_beta, &child_alpha_beta, master_team);                    
+                }
             },
         }
 
-        // Alpha beta pruning
-        match parent_value {
-            Some(value) => {
-                if master_team {
-                    match min_max.max_move {
-                        Some(max_move) => {
-                            if max_move.value >= value {
-                                break;
-                            }
-                        },
-                        None => (),
-                    }
-                } else {
-                    match min_max.min_move {
-                        Some(min_move) => {
-                            if min_move.value <= value {
-                                break;
-                            }
-                        },
-                        None => (),
-                    }
-                }
-            },
-            None => ()
+        // Stop searching this branch if alpha >= beta
+        if alpha_beta.alpha >= alpha_beta.beta {
+            break;
         }
     }
 
-    // Return min/max values depending on the team
-    let return_move;
-    if master_team {
-        return_move = min_max.max_move.unwrap();
-    } else {
-        return_move = min_max.min_move.unwrap();
+
+    // Add alpha/beta to transpositions hashmap
+    if !disable_transpositions {
+        let alpha_beta_hash = zobrist::AlphaBetaHash {
+            alpha_beta_struct: alpha_beta,
+            move_depth: current_depth,
+            half_move: board.half_moves,
+        };
+        transpositions.insert(board_hash, alpha_beta_hash);
     }
 
-    // Add move to transpositions hashmap
-    let move_hash = zobrist::MoveHash {
-        move_struct: return_move,
-        move_depth: current_depth,
-        half_move: board.half_moves,
-    };
-    transpositions.insert(board_hash, move_hash);
-    
-    return_move
+    alpha_beta    
 }
 
 // Returns a vec with potential moves
@@ -441,70 +398,6 @@ mod tests {
     }
 
     #[test]
-    fn update_min_max_test() {
-        use crate::board::board_representation;
-
-        let move1 = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 43,
-            },
-            final_piece_bit: 36,
-            value: 3,
-            heatmap_value: 0,
-        };
-
-        let move2 = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 0,
-            },
-            final_piece_bit: 0,
-            value: 5,
-            heatmap_value: 0,
-        };
-
-        let min_max = MinMax {
-            max_move: None,
-            min_move: None,
-        };
-
-        let min_max = update_min_max(move1, min_max);
-        let min_max = update_min_max(move2, min_max);
-
-        let expected = MinMax {
-            max_move: Some(move2),
-            min_move: Some(move1),
-        };
-
-        assert_eq!(min_max, expected);
-    }
-
-    #[test]
-    fn update_prune_value_test() {
-        use crate::board::board_representation;
-
-        let piece_move = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 0,
-            },
-            final_piece_bit: 0,
-            value: 5,
-            heatmap_value: 0,
-        };
-
-        let min_max = MinMax {
-            max_move: Some(piece_move),
-            min_move: Some(piece_move),
-        };
-
-        let result = update_prune_value(true, &min_max);
-
-        assert_eq!(result, Some(5));
-    }
-
-    #[test]
     fn gen_best_move_test1() {
         use crate::board::board_representation;
 
@@ -512,7 +405,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -524,7 +417,7 @@ mod tests {
             heatmap_value: 0,
         };
 
-        assert_eq!(result, expected);
+        assert_eq!(result.piece_move, Some(expected));
     }
 
     #[test]
@@ -535,7 +428,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, None, &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -547,10 +440,10 @@ mod tests {
             heatmap_value: 0,
         };
 
-        assert_eq!(result, expected);
+        assert_eq!(result.piece_move, Some(expected));
     }
     
-    /*
+    
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
@@ -560,7 +453,7 @@ mod tests {
         let pieces_info = crate::piece::constants::gen();
         
         let bitstrings_array = crate::zobrist::gen_bitstrings_array();
-        let result = gen_best_move(true, 6, 0, 0, None, &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, 4, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -572,7 +465,6 @@ mod tests {
             heatmap_value: 0,
         };
 
-        assert_eq!(result, expected);
+        assert_eq!(result.piece_move, Some(expected));
     }
-    */
 }
