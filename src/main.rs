@@ -10,7 +10,6 @@ use chess2::board::move_generator;
 use chess2::board::move_generator::TurnError;
 use chess2::zobrist;
 
-/*
 fn main() {
     
     let opening_heatmaps: [[[i16; 64]; 12]; 6] = [
@@ -40,7 +39,7 @@ fn main() {
     // Generate bitstrings array for zobrist hashing
     let bitstrings_array = zobrist::gen_bitstrings_array();
 
-    let mut transpositions: HashMap<u64,chess2::zobrist::AlphaBetaHash> = HashMap::new();
+    let mut transpositions: HashMap<u64,chess2::zobrist::MoveHash> = HashMap::new();
 
     // Debug
     let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
@@ -99,7 +98,19 @@ fn main() {
             transpositions.retain(|_, v| v.half_move >= board.half_moves);
 
             // Get ai piece move if it is not the players turn
-            piece_move = chess2::algorithm::gen_best_move(true, 6, 0, 0, None, &opening_heatmap, &bitstrings_array, false, &mut transpositions, board, &pieces_info);
+            piece_move = chess2::algorithm::gen_best_move(
+                true,
+                6,
+                0,
+                0,
+                chess2::algorithm::AlphaBeta::new(),
+                &opening_heatmap,
+                &bitstrings_array,
+                false,
+                &mut transpositions,
+                board,
+                &pieces_info
+            ).piece_move.unwrap();
         }
 
         // Get friendly and enemy kings
@@ -180,11 +191,6 @@ fn main() {
             break;
         }
     }
-}
-*/
-
-fn main() {
-    
 }
 
 // Get ccn input from user (a2, g4, etc) and convert it into a bitboard bit
