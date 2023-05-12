@@ -3,6 +3,7 @@ use rand::thread_rng;
 use rand::Rng;
 use std::io;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use chess2::board::board_representation;
 use chess2::algorithm::Move;
@@ -11,6 +12,8 @@ use chess2::board::move_generator::TurnError;
 use chess2::zobrist;
 
 fn main() {
+
+    let max_move_time = 5000; // Maximum time a move should take in milliseconds
     
     let opening_heatmaps: [[[i16; 64]; 12]; 6] = [
         // a
@@ -100,6 +103,8 @@ fn main() {
             // Get ai piece move if it is not the players turn
             piece_move = chess2::algorithm::gen_best_move(
                 true,
+                &Instant::now(),
+                &max_move_time,
                 6,
                 0,
                 0,

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+use std::time::{Duration, Instant};
+
 use crate::board::board_representation;
 use crate::board::move_generator::EnemyAttacks;
 use crate::TeamBitboards;
@@ -63,6 +65,8 @@ pub fn update_alpha_beta(my_alpha_beta: &mut AlphaBeta, child_alpha_beta: &Alpha
 
 pub fn gen_best_move(
     master_team: bool,
+    start_instant: &Instant,
+    max_search_millis: &u16,
     search_depth: usize,
     current_depth: usize,
     init_value: i8,
@@ -79,7 +83,8 @@ pub fn gen_best_move(
     use crate::zobrist;
 
     // If current depth and search depth are equal stop searching down the move tree
-    if current_depth == search_depth {
+    // Or stop searching if the time elapsed is greater than the maximum allowed time
+    if current_depth == search_depth || &(start_instant.elapsed().as_millis() as u16) > max_search_millis {
         return AlphaBeta {
             alpha: init_value,
             beta: init_value,
@@ -126,7 +131,7 @@ pub fn gen_best_move(
         match transposition {
             Some(move_hash) => {
                 if move_hash.move_depth >= current_depth {
-                    // If the board has allready been evaluated at this depth add the move to the moves
+                    // If the board has allready been evaluated at this depth add the move to the moves vec
                     moves.push_front(move_hash.move_struct);
                 }
             }
@@ -134,23 +139,29 @@ pub fn gen_best_move(
         };
     }
 
-    // Add pv move from lower search depth to the start of moves to increase alpha beta cuttoffs
+    // Add pv move from lower search depth to the start of moves vec to increase alpha beta cuttoffs
     // Iterative deepening
+    let pv_alpha_beta: Option<AlphaBeta>;
     if current_depth == 0 && search_depth > 1 {
-        let pv_move = gen_best_move(
+        let alpha_beta = gen_best_move(
             true, 
+            start_instant,
+            max_search_millis,
             search_depth - 1,
             0,
             0,
             AlphaBeta::new(),
             opening_heatmap,
             zobrist_bitstrings,
-            true,
-            &mut HashMap::new(),
+            false,
+            &mut HashMap::new(), // Create a new transposition hashmap, as storing moves from different search depths in the same transposition table can cause errors
             board,
             pieces_info
-        ).piece_move.unwrap();
-        moves.push_front(pv_move);
+        );
+        moves.push_front(alpha_beta.piece_move.unwrap());
+        pv_alpha_beta = Some(alpha_beta);
+    } else {
+        pv_alpha_beta = None;
     }
 
     for i in 0..moves.len() {
@@ -173,7 +184,9 @@ pub fn gen_best_move(
                 let branch_value = init_value + move_value;
 
                 let mut child_alpha_beta = gen_best_move(
-                    !master_team, 
+                    !master_team,
+                    start_instant,
+                    max_search_millis,
                     search_depth,
                     current_depth + 1,
                     branch_value,
@@ -247,6 +260,13 @@ pub fn gen_best_move(
             half_move: board.half_moves,
         };
         transpositions.insert(board_hash, move_hash);
+    }
+
+    // If the time exceeded the maximum allowed time return the pv move from a lower search depth
+    if current_depth == 0 && search_depth > 1 {
+        if &(start_instant.elapsed().as_millis() as u16) > max_search_millis {
+            return pv_alpha_beta.unwrap();
+        }
     }
 
     alpha_beta    
@@ -405,7 +425,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -428,7 +448,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -443,7 +463,6 @@ mod tests {
         assert_eq!(result.piece_move, Some(expected));
     }
     
-    /*
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
@@ -453,7 +472,7 @@ mod tests {
         let pieces_info = crate::piece::constants::gen();
         
         let bitstrings_array = crate::zobrist::gen_bitstrings_array();
-        let result = gen_best_move(true, 6, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &2000, 50, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -468,5 +487,4 @@ mod tests {
         println!("{:?}", result);
         assert_eq!(result.piece_move, Some(expected));
     }
-    */
 }
