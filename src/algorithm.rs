@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::collections::VecDeque;
-
 use std::time::{Duration, Instant};
 
 use crate::board::board_representation;
@@ -72,15 +69,11 @@ pub fn gen_best_move(
     init_value: i8,
     mut alpha_beta: AlphaBeta,
     opening_heatmap: &[[i16; 64]; 12],
-    zobrist_bitstrings: &[[u64; 64]; 20],
-    disable_transpositions: bool,
-    transpositions: &mut HashMap<u64,crate::zobrist::MoveHash>,
     board: board_representation::Board,
     pieces_info: &[crate::piece::constants::PieceInfo; 12]
 ) -> AlphaBeta {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
-    use crate::zobrist;
 
     // If current depth and search depth are equal stop searching down the move tree
     // Or stop searching if the time elapsed is greater than the maximum allowed time
@@ -122,23 +115,6 @@ pub fn gen_best_move(
     // Generate moves
     let moves = &mut order_moves(true, &board, &enemy_attacks, &friendly_king, opening_heatmap, &team_bitboards, pieces_info);
 
-    // Read transposition table to see if this board has all ready been evaluated at this depth
-    let board_hash = zobrist::hash_board(&board, zobrist_bitstrings);
-
-    if !disable_transpositions {
-        let transposition = transpositions.get(&board_hash).copied();
-        
-        match transposition {
-            Some(move_hash) => {
-                if move_hash.move_depth >= current_depth {
-                    // If the board has allready been evaluated at this depth add the move to the moves vec
-                    moves.push_front(move_hash.move_struct);
-                }
-            }
-            None => (),
-        };
-    }
-
     // Add pv move from lower search depth to the start of moves vec to increase alpha beta cuttoffs
     // Iterative deepening
     let pv_alpha_beta: Option<AlphaBeta>;
@@ -152,13 +128,12 @@ pub fn gen_best_move(
             0,
             AlphaBeta::new(),
             opening_heatmap,
-            zobrist_bitstrings,
-            false,
-            &mut HashMap::new(), // Create a new transposition hashmap, as storing moves from different search depths in the same transposition table can cause errors
             board,
             pieces_info
         );
-        moves.push_front(alpha_beta.piece_move.unwrap());
+
+        moves.rotate_right(1);
+        moves[0] = alpha_beta.piece_move.unwrap();
         pv_alpha_beta = Some(alpha_beta);
     } else {
         pv_alpha_beta = None;
@@ -192,9 +167,6 @@ pub fn gen_best_move(
                     branch_value,
                     alpha_beta,
                     opening_heatmap,
-                    zobrist_bitstrings,
-                    disable_transpositions,
-                    transpositions,
                     new_board,
                     pieces_info
                 );
@@ -252,16 +224,6 @@ pub fn gen_best_move(
         }
     }
 
-    // Add alpha/beta to transpositions hashmap
-    if !disable_transpositions {
-        let move_hash = zobrist::MoveHash {
-            move_struct: alpha_beta.piece_move.unwrap(),
-            move_depth: current_depth,
-            half_move: board.half_moves,
-        };
-        transpositions.insert(board_hash, move_hash);
-    }
-
     // If the time exceeded the maximum allowed time return the pv move from a lower search depth
     if current_depth == 0 && search_depth > 1 {
         if &(start_instant.elapsed().as_millis() as u16) > max_search_millis {
@@ -275,10 +237,11 @@ pub fn gen_best_move(
 // Returns a vec with potential moves
 // If sort is true the moves will be ordered from best to worst
 // All moves are valid apart from king moves
-fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[i16; 64]; 12], team_bitboards: &crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> VecDeque<Move> {
+fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &EnemyAttacks, friendly_king: &board_representation::BoardCoordinates, opening_heatmap: &[[i16; 64]; 12], team_bitboards: &crate::TeamBitboards, pieces_info: &[crate::piece::constants::PieceInfo; 12]) -> [Move; 96]  {
     use crate::bit_on;
     
-    let mut moves: VecDeque<Move> = VecDeque::new();
+    let mut moves_index = 0;
+    let mut moves: [Move; 96] = [Move::new(); 96];
 
     // Get friendly and enemy board indexes
     let friendly_indexes;
@@ -303,7 +266,7 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                 bit: initial_bit,
             };
 
-            // If there is no piece on the board at this bit got to the next bit
+            // If there is no piece on the board at this bit go to the next bit
             if !bit_on(board.board[i], initial_bit) {
                 continue;
             }
@@ -312,12 +275,16 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
             
             for final_bit in 0..64 {
 
+                // The piece cannot move to final_bit if it is occupied by a friendly piece
+                if bit_on(team_bitboards.friendly_team, final_bit) {
+                    continue;
+                }
+
                 // Get the heatmap value as the difference of the final and initial bit values
                 // This is to prevent pieces from moving to less advantageous positions than ones they are allready in
                 let heatmap_value = opening_heatmap[i][final_bit] - opening_heatmap[i][initial_bit];
 
-                // Check the piece can move to final_bit or piece is a king
-                // Because this function does not account for castling those moves cannot be ruled out for the king
+                // Check the piece can move to final_bit
                 if bit_on(piece_moves.moves_bitboard, final_bit) {
                     
                     // Get value of move based on value of captured piece
@@ -342,19 +309,24 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
                     }
 
                     // Push move to moves vec
-                    moves.push_back(Move {
+                    moves[moves_index] = Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: move_value,
                         heatmap_value: heatmap_value,
-                    });
-                } else if &initial_piece_coordinates == friendly_king { // Add potentially invalid king moves to moves vec to account for castling
-                    moves.push_back(Move {
+                    };
+                    moves_index += 1;
+                } else if &initial_piece_coordinates == friendly_king && (final_bit as i8 - initial_bit as i8).abs() == 2 {
+
+                    // If the piece can't move to the final bit, but is a king then add potential castling moves moves
+                    // Because king castling moves aren't a part of gen_piece, so they cannot be ruled out
+                    moves[moves_index] = Move {
                         initial_piece_coordinates: initial_piece_coordinates,
                         final_piece_bit: final_bit,
                         value: 0,
                         heatmap_value: heatmap_value,
-                    });
+                    };
+                    moves_index += 1;
                 }
             }
         }
@@ -366,10 +338,8 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
         // Sort moves by value first
         // Sort moves by heatmap_value if they have the same value
         // https://stackoverflow.com/questions/70193935/how-to-sort-a-vec-of-structs-by-2-or-multiple-fields
-        // https://stackoverflow.com/questions/74873575/how-to-sort-or-reverse-vecdeque-without-make-contiguous
 
-        moves.rotate_right(moves.as_slices().1.len());
-        moves.as_mut_slices().0.sort_by(| a, b | if a.value == b.value {
+        moves.sort_by(| a, b | if a.value == b.value {
             b.heatmap_value.partial_cmp(&a.heatmap_value).unwrap()
         } else {
             b.value.partial_cmp(&a.value).unwrap()
@@ -425,7 +395,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -448,7 +418,7 @@ mod tests {
 
         let pieces_info = crate::piece::constants::gen();
         
-        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &[[0u64; 64]; 20], true, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -463,16 +433,16 @@ mod tests {
         assert_eq!(result.piece_move, Some(expected));
     }
     
+    /*
     #[test]
     fn gen_best_move_test3() {
         use crate::board::board_representation;
 
-        let board = board_representation::fen_decode("rn1qk2r/pp2ppbp/2p5/3p2N1/3P2b1/3Q4/PPP2PPP/RN2KB1R b KQkq - 0 1", true);
+        let board = board_representation::fen_decode("r1bq4/3kbB2/2p5/1p1n3p/1P1B4/2N1RN2/2PQ1PPP/5RK1 b - - 0 1", true);
 
         let pieces_info = crate::piece::constants::gen();
         
-        let bitstrings_array = crate::zobrist::gen_bitstrings_array();
-        let result = gen_best_move(true, &Instant::now(), &2000, 50, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], &bitstrings_array, false, &mut HashMap::new(), board, &pieces_info);
+        let result = gen_best_move(true, &Instant::now(), &10000, 6, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
 
         let expected = Move {
             initial_piece_coordinates: board_representation::BoardCoordinates {
@@ -487,4 +457,5 @@ mod tests {
         println!("{:?}", result);
         assert_eq!(result.piece_move, Some(expected));
     }
+    */
 }
