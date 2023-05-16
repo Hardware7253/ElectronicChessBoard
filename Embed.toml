@@ -1,0 +1,24 @@
+[default.probe]
+protocol = "Swd"
+
+[default.flashing]
+enabled = true
+restore_unwritten_bytes = false
+
+[default.reset]
+enabled = true
+halt_afterwards = false
+
+[default.general]
+chip = "stm32f103c8"
+chip_descriptions = []
+log_level = "WARN"
+
+[default.rtt]
+enabled = true
+channels = []
+timeout = 3000
+show_timestamps = false
+
+[default.gdb]
+enabled = false

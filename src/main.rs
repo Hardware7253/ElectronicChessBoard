@@ -1,247 +1,100 @@
-extern crate rand;
-use rand::thread_rng;
-use rand::Rng;
-use std::io;
-use std::time::{Duration, Instant};
+#![no_std]
+#![no_main]
 
-use chess2::board::board_representation;
-use chess2::algorithm::Move;
-use chess2::board::move_generator;
-use chess2::board::move_generator::TurnError;
+use panic_halt as _;
 
-fn main() {
+use cortex_m_rt::entry;
+use embedded_hal::digital::v2::OutputPin;
+use stm32f1xx_hal as hal;
+use hal::{pac, pac::DWT, pac::DCB, delay::Delay, prelude::*};
 
-    let max_move_time = 5000; // Maximum time a move should take in milliseconds
-    
-    let opening_heatmaps: [[[i16; 64]; 12]; 6] = [
-        // a
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 3, 0, 0, 0, 0, 1, 24, 6, 123, 32, 2, 2, 2, 13, 42, 327, 340, 131, 56, 50, 14, 11, 43, 14, 25, 45, 21, 150, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 2, 47, 2, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 1, 2, 0, 2, 0, 0, 0, 1, 6, 5, 0, 0, 2, 3, 0, 232, 0, 0, 280, 0, 8, 0, 0, 0, 15, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 31, 0, 0, 0, 3, 0, 0, 6, 0, 4, 2, 1, 0, 7, 1, 0, 0, 3, 0, 29, 0, 1, 13, 0, 100, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 3, 1, 0, 0, 4, 0, 0, 0, 1, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0, 5, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 3, 47, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 27, 44, 111, 121, 7, 128, 4, 4, 47, 170, 187, 169, 101, 16, 6, 0, 2, 8, 31, 36, 8, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 7, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1, 8, 6, 1, 0, 0, 7, 1, 83, 0, 0, 332, 0, 11, 0, 0, 0, 7, 4, 0, 1, 0, 0, 0, 1, 1, 14, 0, 10, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 27, 0, 78, 0, 8, 0, 0, 8, 5, 0, 0, 0, 0, 0, 3, 0, 0, 8, 0, 0, 0, 12, 0, 0, 0, 0, 16, 0, 0, 0, 5, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0], [1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0, 15, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+use rtt_target::{rprintln, rtt_init_print};
 
-        // b
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 5, 0, 0, 0, 0, 1, 19, 92, 99, 8, 1, 3, 3, 22, 83, 534, 732, 77, 19, 14, 6, 10, 64, 18, 0, 29, 25, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 18, 3, 45, 1, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 1, 0, 4, 0, 0, 1, 13, 0, 6, 2, 1, 7, 0, 0, 0, 0, 196, 24, 0, 0, 0, 12, 14, 350, 0, 0, 404, 8, 3, 0, 0, 1, 21, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, 1, 0, 0, 4, 0, 1, 0, 26, 0, 1, 0, 0, 52, 0, 0, 0, 70, 1, 0, 3, 0, 2, 0, 14, 0, 25, 69, 0, 0, 0, 0, 5, 2, 5, 59, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 10, 1, 0, 2, 0, 0, 1, 0, 3, 0, 7, 0, 0, 0, 0, 0, 34, 13, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 18, 0, 0, 0, 45, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 108, 14, 122, 273, 145, 14, 175, 12, 4, 27, 398, 190, 73, 13, 7, 5, 0, 7, 2, 241, 38, 0, 1, 0, 1, 0, 15, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 3, 1, 0, 47, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1, 28, 3, 0, 1, 0, 3, 27, 239, 0, 0, 341, 1, 8, 7, 0, 1, 57, 5, 0, 0, 2, 0, 2, 0, 8, 8, 1, 6, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 17, 29, 0, 123, 2, 1, 0, 1, 3, 9, 0, 8, 2, 0, 0, 7, 0, 0, 28, 1, 1, 0, 10, 3, 2, 1, 0, 29, 0, 0, 0, 4, 3, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 1, 3, 0, 0, 0, 0, 0, 0, 17, 4, 0, 0, 0, 0, 0, 14, 0, 4, 2, 0, 0, 0, 44, 0, 0, 29, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+#[entry]
+fn main() -> ! {
+    use chess2::board::board_representation;
+    use chess2::algorithm;
 
-        // C
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 13, 3, 2, 8, 1, 0, 0, 6, 5, 101, 172, 12, 3, 0, 12, 72, 34, 605, 1171, 249, 8, 46, 27, 5, 247, 68, 0, 5, 22, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 84, 274, 0, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 8, 0, 2, 3, 0, 0, 0, 9, 0, 10, 125, 1, 63, 0, 2, 0, 8, 54, 22, 0, 1, 2, 0, 3, 315, 1, 3, 848, 1, 4, 0, 0, 1, 52, 20, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 20, 1, 0, 0, 0, 34, 0, 0, 5, 0, 1, 0, 284, 0, 12, 2, 0, 57, 0, 139, 1, 363, 1, 0, 6, 0, 3, 4, 90, 0, 37, 20, 1, 0, 0, 0, 11, 16, 21, 21, 0, 3, 0, 0, 0, 2, 0, 0, 2, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 2, 1, 1, 0, 18, 8, 0, 1, 16, 1, 2, 22, 0, 0, 10, 0, 4, 6, 29, 0, 0, 0, 0, 2, 7, 42, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 6, 3, 0, 0, 0, 0, 2, 4, 0, 22, 273, 3], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 163, 5, 78, 223, 178, 15, 19, 35, 1, 107, 79, 357, 998, 92, 100, 6, 0, 0, 9, 190, 61, 161, 66, 2, 0, 0, 19, 1, 2, 16, 3, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 3, 0, 1, 5, 96, 5, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 9, 0, 2, 0, 0, 4, 0, 0, 4, 1, 53, 39, 1, 0, 0, 1, 2, 617, 15, 1, 537, 2, 10, 44, 0, 4, 14, 16, 3, 0, 2, 0, 6, 2, 30, 140, 1, 4, 0, 0, 0, 3, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 6, 0, 26, 146, 0, 15, 0, 0, 31, 1, 23, 30, 4, 0, 2, 27, 0, 222, 0, 2, 3, 2, 0, 0, 150, 0, 3, 0, 0, 27, 4, 0, 0, 26, 0, 1, 2, 0, 0, 0, 0, 0, 2, 0, 3, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0], [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 15, 4, 36, 0, 0, 0, 0, 4, 0, 3, 0, 35, 6, 0, 4, 0, 0, 18, 4, 3, 12, 2, 0, 0, 1, 7, 2, 2, 0, 45, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 7, 0, 4, 96, 0, 0, 0, 0, 0, 5, 16, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+    // Init buffers for debug printing
+    rtt_init_print!();
 
-        // d
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 18, 101, 32, 0, 0, 0, 22, 1, 409, 517, 130, 1, 8, 3, 5, 5, 21, 0, 184, 42, 40, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 33, 7, 0, 62, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 2, 16, 0, 5, 0, 7, 0, 2, 7, 7, 0, 0, 1, 1, 0, 362, 0, 0, 343, 0, 0, 0, 0, 0, 16, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 13, 1, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 2, 1, 0, 0, 0, 127, 0, 0, 1, 69, 0, 0, 30, 0, 21, 0, 3, 1, 73, 14, 0, 0, 0, 0, 3, 1, 13, 3, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 7, 0, 10, 2, 1, 0, 0, 0, 0, 29, 0, 2, 0, 6, 0, 0, 0, 0, 22, 2, 11, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 1, 62, 2], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 38, 14, 155, 0, 248, 4, 81, 28, 1, 45, 120, 557, 39, 5, 8, 1, 0, 4, 143, 44, 55, 0, 0, 1, 0, 0, 0, 0, 2, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 1, 4, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 4, 2, 70, 0, 0, 374, 0, 0, 3, 0, 0, 42, 6, 0, 0, 0, 0, 1, 0, 1, 16, 0, 1, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 1, 76, 0, 60, 0, 1, 0, 0, 9, 12, 1, 1, 0, 0, 0, 8, 0, 0, 38, 0, 0, 0, 27, 0, 0, 1, 0, 25, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 2, 21, 0, 0, 0, 0, 5, 0, 2, 0, 1, 0, 0, 14, 0, 0, 4, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+    // Get access to device and core peripherals
+    let dp = pac::Peripherals::take().unwrap();
+    let mut cp = cortex_m::Peripherals::take().unwrap();
 
-        // e
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 13, 58, 3, 0, 0, 0, 1, 5, 291, 292, 82, 9, 3, 3, 39, 11, 15, 0, 47, 27, 85, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 5, 71, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 211, 0, 0, 179, 0, 0, 0, 0, 0, 11, 16, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 4, 0, 0, 2, 0, 5, 0, 0, 0, 20, 20, 0, 2, 0, 0, 3, 0, 17, 52, 1, 66, 0, 0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 2, 0, 0, 0, 0, 2, 0, 7, 7, 2, 0, 0, 0, 0, 0, 0, 37, 5, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 65, 19, 109, 175, 0, 122, 7, 7, 12, 67, 69, 47, 5, 3, 0, 0, 0, 12, 6, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 4, 0, 0, 1, 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 34, 10, 0, 0, 0, 6, 0, 48, 0, 0, 290, 1, 0, 2, 0, 3, 10, 0, 0, 0, 6, 0, 0, 1, 0, 12, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 38, 0, 0, 29, 0, 111, 0, 10, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 0, 98, 0, 0, 0, 0, 1, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+    // Get access to RCC, FLASH, AFIO, and GPIO
+    let mut rcc = dp.RCC.constrain();
+    let mut flash = dp.FLASH.constrain();
+    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
+    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
 
-        // all
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
-    ];
+    // Disable jtag so pa15, pb3, and pb4 can be used
+    // These pins have to be set like so: pb7.into_push_pull_output(&mut gpiob.crl);
+    let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
 
-    // Choose random opening heatmap to affect which squares the ai views as advantageous during the early game
-    let heatmap: usize = thread_rng().gen_range(0, 6);
-    let opening_heatmap = opening_heatmaps[heatmap];
+    // Initialize led pin
+    // When initializing pins use crl register for pins 0-7 and crh for pins 8-15
+    let mut led = gpiob.pb7.into_push_pull_output(&mut gpiob.crl).downgrade();
 
-    // Debug
-    let board = board_representation::fen_decode("7P/PP2P1P1/1P1P1P1P/2P1P3/1P1P3P/P1P1P1P1/1P3P2/6P1 w - - 0 1", true);
-    println!("{:?}", board.board);
+    // Configure and apply clock configuration
+    let clock_mhz = 48;
+    let clocks = rcc.cfgr
+        // External oscillator
+        .use_hse(16.mhz())
 
-    let mut bug_board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true);
-    bug_board.board = [2260630401189888, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    //bug_board.board = [64176303279964160, 2305860601399738368, 4398314946560, 139264, 2251799813685248, 4611686018427387904, 2181300224, 1, 134217728, 4100, 16, 8, 18382567779019522047];
+        // Bus and core clocks
+        .hclk(clock_mhz.mhz())
+        .sysclk(clock_mhz.mhz())
 
-    let bug_board_fen_encode = board_representation::fen_encode(&bug_board);
-    println!("{}", bug_board_fen_encode);
-    // Debug
+        // Peripheral clocks
+        .pclk1(12.mhz())
+        .pclk2(12.mhz())
+    .freeze(&mut flash.acr);
 
-    // Get team of the player
-    print!("Player White? ");
-    let player_white = get_user_bool(true);
-    println!("");
-    
-    let mut board = board_representation::fen_decode("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true); // Initialise board with starting position
+    // Set up systick delay
+    let mut delay = Delay::new(cp.SYST, clocks);
+
+    // Enable cycle counter
+    cp.DCB.enable_trace();
+    cp.DWT.enable_cycle_counter();
+
+    // Initiliaze board to starting board
+    let board = board_representation::Board {
+        board: [71776119061217280, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 65280, 129, 66, 36, 8, 16, 7926616819148718190],
+        whites_move:true,
+        points: board_representation::Points { white_points: 0, black_points: 0 },
+        points_delta: 0,
+        half_moves: 0,
+        half_move_clock: 0,
+        en_passant_target: None
+    };
 
     let pieces_info = chess2::piece::constants::gen();
 
+    let best_move = algorithm::gen_best_move(
+        true,
+        &DWT::cycle_count(),
+        &chess2::embedded::ms_to_clocks(1000, clock_mhz),
+        6,
+        0,
+        0,
+        algorithm::AlphaBeta::new(),
+        &[[0i16; 64]; 12],
+        board,
+        &pieces_info,
+    );
+
+    rprintln!("{:?}", best_move);
+
+    // Blink led
     loop {
-        println!("Turn start, Whites turn: {}", board.whites_move);
-        //println!("{:?}", board);
-        println!("");
+        led.set_high().ok();
+        rprintln!("Led on");
+        delay.delay_ms(1000u16);
 
-        let half_move_clock = board.half_move_clock;
-
-        let player_turn = player_white == board.whites_move;
-
-        let mut piece_move = Move::new();
-
-        // Get Turn from player / ai
-        if player_turn {
-
-            // Get user initial and final bit for the move
-            piece_move.initial_piece_coordinates.bit = get_user_bit("Move piece from coordinates:");
-            piece_move.final_piece_bit = get_user_bit("To new coordinates:");
-
-            // Flip bitboard piece bits to the white teams perspective if the player is black team
-            if !player_white {
-                piece_move.initial_piece_coordinates.bit = chess2::flip_bitboard_bit(piece_move.initial_piece_coordinates.bit);
-                piece_move.final_piece_bit = chess2::flip_bitboard_bit(piece_move.final_piece_bit);
-            }
-
-            // Get board index for piece
-            for i in 0..12 {
-                if chess2::bit_on(board.board[i], piece_move.initial_piece_coordinates.bit) {
-                    piece_move.initial_piece_coordinates.board_index = i;
-                }
-            }
-        } else {
-            // Get ai piece move if it is not the players turn
-            piece_move = chess2::algorithm::gen_best_move(
-                true,
-                &Instant::now(),
-                &max_move_time,
-                6,
-                0,
-                0,
-                chess2::algorithm::AlphaBeta::new(),
-                &opening_heatmap,
-                board,
-                &pieces_info
-            ).piece_move.unwrap();
-        }
-
-        // Get friendly and enemy kings
-        let friendly_king_index;
-        let enemy_king_index;
-        if board.whites_move {
-            friendly_king_index = 5;
-            enemy_king_index = 11;
-        } else {
-            friendly_king_index = 11;
-            enemy_king_index = 5;
-        }
-
-        let friendly_king = board_representation::BoardCoordinates {
-            board_index: friendly_king_index,
-            bit: chess2::find_bit_on(board.board[friendly_king_index], 0),
-        };
-
-        let enemy_king = board_representation::BoardCoordinates {
-            board_index: enemy_king_index,
-            bit: chess2::find_bit_on(board.board[enemy_king_index], 0),
-        };
-
-        // Get new_turn_board
-        let team_bitboards = chess2::TeamBitboards::new(friendly_king.board_index, &board);
-        let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, &pieces_info);
-        let new_turn_board = move_generator::new_turn(&piece_move.initial_piece_coordinates, piece_move.final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
-
-        let mut initial_bit = piece_move.initial_piece_coordinates.bit;
-        let mut final_bit = piece_move.final_piece_bit;
-        
-        // Flip bitboard bits back to the right perspective if the player is on the black team
-        if !player_white {
-            initial_bit = chess2::flip_bitboard_bit(initial_bit);
-            final_bit = chess2::flip_bitboard_bit(final_bit);
-        }
-
-        // Convert moves to ccn
-        let initial_ccn = chess2::bit_to_ccn(initial_bit);
-        let final_ccn = chess2::bit_to_ccn(final_bit);
-
-        match new_turn_board {
-            Ok(new_board) => {
-                if !player_turn { // If ai move        
-                    println!("Ai moves from {}, to {}, with value: {}", initial_ccn, final_ccn, piece_move.value);
-                    println!("");
-                }
-
-                // Update board
-                board = new_board
-            },
-            Err(error) => { // End the game, or let the game continue depending on the error
-                match error {
-                    TurnError::Win => {
-
-                        if !player_turn { // If ai move        
-                            println!("Ai moves from {}, to {}", initial_ccn, final_ccn);
-                            println!("");
-                        }
-
-                        if board.whites_move {
-                            println!("White team wins");
-                        } else {
-                            println!("Black team wins");
-                        }
-                        break
-                    }
-                    TurnError::Draw => {println!("Game over, draw"); break},
-                    TurnError::InvalidMove => {println!("Invalid move, try again"); continue}
-                    TurnError::InvalidMoveCheck => {println!("Invalid move, the king is in check"); continue}
-                }
-            },
-        }
-        // Draw game based on half move clock after the move has taken place
-        // This is so checkmates made this move take priority over the half move draw
-        if half_move_clock == 100 {
-            println!("Draw, too many consecutive moves without capture or pawn move");
-            break;
-        }
+        led.set_low().ok();
+        rprintln!("Led off");
+        delay.delay_ms(1000u16);
     }
-}
-
-// Get ccn input from user (a2, g4, etc) and convert it into a bitboard bit
-// Loop until the user inputs a value with the correct formatting
-fn get_user_bit(message: &str) -> usize {
-    let bit = loop {
-        println!("{}", message);
-
-        // Get user input as a string
-        let mut ccn = String::new();
-        io::stdin()
-            .read_line(&mut ccn)
-            .expect("Failed to read input");
-
-        let bit = chess2::ccn_to_bit(&ccn);
-
-        // If the chess_to_engine function fails, provide an error and allow the user to try again
-        let bit = match bit {
-            Ok(c) => c,
-            Err(_) => {
-                println!("Please use correct coordinate formatting (E.g. a1). This is case sensetive.");
-                println!();
-                continue;
-            },
-        };
-
-        println!();
-        break bit;
-    };
-
-    bit
-}
-
-// Get y/n bool input
-fn get_user_bool(default_yes: bool) -> bool {
-    if default_yes {
-        println!("[Y, n]");
-    } else {
-        println!("[y, N]");
-    }
-    
-    // Get user input as a string
-    let mut yn = String::new();
-    io::stdin()
-        .read_line(&mut yn)
-        .expect("Failed to read input");
-
-    // Get first character of the input string
-    let yn: Vec<char> = yn.chars().collect();
-    let yn = yn[0];
-
-    if default_yes {
-        if yn == 'n' || yn == 'N' {
-            return false;
-        }
-        return true;
-    }
-
-    if yn == 'y' || yn == 'Y' {
-        return true;
-    }
-    false
 }

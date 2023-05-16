@@ -1,3 +1,12 @@
+#![no_std]
+#![no_main]
+
+use core::convert::TryFrom;
+use core::convert::TryInto;
+
+use core::result::Result::Ok;
+use core::result::Result::Err;
+
 pub mod board;
 pub mod piece;
 pub mod algorithm;
@@ -20,35 +29,6 @@ pub fn num_to_char(num: usize) -> Result<char, ()> {
     let num = u8::try_from(num).unwrap();
     let char_num = (num + 48) as char;
     Ok(char_num)
-}
-
-// Chess coordinate notation to bitboard bit
-pub fn ccn_to_bit(ccn: &str) -> Result<usize, ()> {
-    let ccn_vec: Vec<char> = ccn.chars().collect();
-    if ccn_vec.len() < 2 {
-        return Err(());
-    }
-
-    let x = char_to_num(ccn_vec[0], 48);
-    let y = char_to_num(ccn_vec[1], 0);
-
-    let x = match x {
-        Ok(num) => num,
-        Err(()) => return Err(())
-    };
-
-    let y = match y {
-        Ok(num) => num,
-        Err(()) => return Err(())
-    };
-
-    if x > 8 || y > 8 {
-        return Err(())
-    }
-
-    let i = {{y - 8}.abs() * 8} + x - 1;
-
-    Ok(i.try_into().unwrap())
 }
 
 pub fn bit_to_ccn(bit: usize) -> &'static str {
@@ -173,89 +153,9 @@ impl TeamBitboards {
     }
 }
 
-#[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn char_to_num_test() {
-            assert_eq!(char_to_num('4', 0), Ok(4));
-        }
-
-        #[test]
-        fn num_to_char_test() {
-            assert_eq!(num_to_char(8), Ok('8'));
-        }
-
-        #[test]
-        fn ccn_to_bit_test() {
-            assert_eq!(ccn_to_bit("a1"), Ok(56));
-            assert_eq!(ccn_to_bit("a9"), Err(()));
-        }
-        
-        #[test]
-        fn bit_to_ccn_test() {
-            assert_eq!(bit_to_ccn(28), "e5");
-        }
-
-        #[test]
-        fn bit_to_cartesian_test() {
-            assert_eq!(bit_to_cartesian(27), [3, 3]);  
-        }
-
-        #[test]
-        fn bit_move_valid_test() {
-            assert_eq!(bit_move_valid(56, -17), false);
-            assert_eq!(bit_move_valid(60, -8), true);
-        }
-
-        #[test]
-        fn or_bitboards_test() {
-            let board = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-            assert_eq!(or_bitboards(0, 1, &board), 3);
-        }
-
-        #[test]
-        fn board_index_white_test() {
-            assert_eq!(board_index_white(7), false);
-        }
-
-        #[test]
-        fn bit_on_test() {
-            assert_eq!(bit_on(4, 2), true);
-            assert_eq!(bit_on(0, 1), false);
-        }
-
-        #[test]
-        fn find_bit_on_test() {
-            assert_eq!(find_bit_on(8, 0), 3);
-        }
-
-        #[test]
-        fn flip_bitboard_bit_test() {
-            assert_eq!(flip_bitboard_bit(49), 14);
-        }
-
-        #[test]
-        fn common_bit_test() {
-            assert_eq!(common_bit(5, 6), true);
-            assert_eq!(common_bit(3, 1), true);
-            assert_eq!(common_bit(9, 8), true);
-            assert_eq!(common_bit(10, 5), false);
-            assert_eq!(common_bit(7, 8), false);
-        }
-
-        #[test]
-        fn gen_team_bitboards_test() {
-            let board = crate::board::board_representation::fen_decode("r2qkbnr/pp1npppp/3N4/1p3b2/3P4/8/PPP1QPPP/R1B1K1NR b - - 0 1", true);
-
-            let result = TeamBitboards::new(10, &board);
-
-            let expected = TeamBitboards {
-                friendly_team: 570489849,
-                enemy_team: 15417791883686445056,
-            };
-
-            assert_eq!(result, expected);
-        }
+pub mod embedded {
+    // Converts milliseconds to cpu clocks
+    pub fn ms_to_clocks(millis: u32, clock_mhz: u32) -> u32 {
+        millis * clock_mhz * 1000
     }
+}

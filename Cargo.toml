@@ -3,7 +3,20 @@ name = "chess2"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+opt-level = 'z'
+lto = true
 
 [dependencies]
-rand = "0.7.3"
+cortex-m = "^0.6.3"       # Access to the generic ARM peripherals
+cortex-m-rt = "^0.6.12"   # Startup code for the ARM Core
+embedded-hal = "^0.2.4"   # Access to generic embedded functions (`set_high`)
+embedded-time = "0.12.1"
+panic-halt = "^0.2.0"     # Panic handler
+rtt-target = {version = "0.3.1", features = ["cortex-m"]}
+
+# Access to the STM32F103 HAL.
+[dependencies.stm32f1xx-hal]
+# STM32F103C8T6 contains 64kB of flash which is medium density
+features = ["stm32f103", "rt", "medium"]
+version = "^0.6.1"

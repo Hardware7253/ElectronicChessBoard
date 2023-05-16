@@ -1,10 +1,14 @@
-use std::time::{Duration, Instant};
+#![no_std]
+#![no_main]
+
+use core::cmp::PartialOrd;
+use rtt_target::{rprintln, rtt_init_print};
 
 use crate::board::board_representation;
 use crate::board::move_generator::EnemyAttacks;
 use crate::TeamBitboards;
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Move {
     pub initial_piece_coordinates: board_representation::BoardCoordinates,
     pub final_piece_bit: usize,
@@ -62,8 +66,8 @@ pub fn update_alpha_beta(my_alpha_beta: &mut AlphaBeta, child_alpha_beta: &Alpha
 
 pub fn gen_best_move(
     master_team: bool,
-    start_instant: &Instant,
-    max_search_millis: &u16,
+    start_cycles: &u32,
+    max_elapsed_cycles: &u32,
     search_depth: usize,
     current_depth: usize,
     init_value: i8,
@@ -74,10 +78,11 @@ pub fn gen_best_move(
 ) -> AlphaBeta {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
+    use stm32f1xx_hal::pac::DWT;
 
     // If current depth and search depth are equal stop searching down the move tree
     // Or stop searching if the time elapsed is greater than the maximum allowed time
-    if current_depth == search_depth || &(start_instant.elapsed().as_millis() as u16) > max_search_millis {
+    if current_depth == search_depth || DWT::cycle_count() > start_cycles + max_elapsed_cycles {
         return AlphaBeta {
             alpha: init_value,
             beta: init_value,
@@ -120,9 +125,9 @@ pub fn gen_best_move(
     let pv_alpha_beta: Option<AlphaBeta>;
     if current_depth == 0 && search_depth > 1 {
         let alpha_beta = gen_best_move(
-            true, 
-            start_instant,
-            max_search_millis,
+            true,
+            start_cycles,
+            max_elapsed_cycles,
             search_depth - 1,
             0,
             0,
@@ -160,8 +165,8 @@ pub fn gen_best_move(
 
                 let mut child_alpha_beta = gen_best_move(
                     !master_team,
-                    start_instant,
-                    max_search_millis,
+                    start_cycles,
+                    max_elapsed_cycles,
                     search_depth,
                     current_depth + 1,
                     branch_value,
@@ -226,7 +231,7 @@ pub fn gen_best_move(
 
     // If the time exceeded the maximum allowed time return the pv move from a lower search depth
     if current_depth == 0 && search_depth > 1 {
-        if &(start_instant.elapsed().as_millis() as u16) > max_search_millis {
+        if DWT::cycle_count() > start_cycles + max_elapsed_cycles {
             return pv_alpha_beta.unwrap();
         }
     }
@@ -339,123 +344,11 @@ fn order_moves(sort: bool, board: &board_representation::Board, enemy_attacks: &
         // Sort moves by heatmap_value if they have the same value
         // https://stackoverflow.com/questions/70193935/how-to-sort-a-vec-of-structs-by-2-or-multiple-fields
 
-        moves.sort_by(| a, b | if a.value == b.value {
+        moves.sort_unstable_by(| a, b | if a.value == b.value {
             b.heatmap_value.partial_cmp(&a.heatmap_value).unwrap()
         } else {
             b.value.partial_cmp(&a.value).unwrap()
         });
     }
     moves
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn order_moves_test() {
-        use crate::board::board_representation;
-        use crate::board::move_generator;
-
-        let opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
-        
-        let board = board_representation::fen_decode("k7/8/8/8/4r3/3P4/8/7K w - - 0 1", true);
-
-        let king = board_representation::BoardCoordinates {
-            board_index: 5,
-            bit: 63,
-        };
-
-        let team_bitboards = TeamBitboards::new(king.board_index, &board);
-
-        let pieces_info = crate::piece::constants::gen();
-
-        let enemy_attacks = move_generator::gen_enemy_attacks(&king, team_bitboards, &board, &pieces_info);
-
-        let result = order_moves(true, &board, &enemy_attacks, &king, &opening_heatmap, &team_bitboards, &pieces_info);
-
-        let best_move = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 43,
-            },
-            final_piece_bit: 36,
-            value: 5,
-            heatmap_value: result[0].heatmap_value,
-        };
-
-        assert_eq!(result[0], best_move);
-    }
-
-    #[test]
-    fn gen_best_move_test1() {
-        use crate::board::board_representation;
-
-        let board = board_representation::fen_decode("7k/2K5/8/8/8/r2r4/3R3n/8 w - - 0 1", true);
-
-        let pieces_info = crate::piece::constants::gen();
-        
-        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
-
-        let expected = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 1,
-                bit: 51,
-            },
-            final_piece_bit: 55,
-            value: 0,
-            heatmap_value: 0,
-        };
-
-        assert_eq!(result.piece_move, Some(expected));
-    }
-
-    #[test]
-    fn gen_best_move_test2() { // Test a capture with en passant being the best move
-        use crate::board::board_representation;
-
-        let board = board_representation::fen_decode("K7/8/8/4pP2/8/8/8/k7 w - e6 0 1", true);
-
-        let pieces_info = crate::piece::constants::gen();
-        
-        let result = gen_best_move(true, &Instant::now(), &10000, 3, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
-
-        let expected = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 29,
-            },
-            final_piece_bit: 20,
-            value: 0,
-            heatmap_value: 0,
-        };
-
-        assert_eq!(result.piece_move, Some(expected));
-    }
-    
-    /*
-    #[test]
-    fn gen_best_move_test3() {
-        use crate::board::board_representation;
-
-        let board = board_representation::fen_decode("r1bq4/3kbB2/2p5/1p1n3p/1P1B4/2N1RN2/2PQ1PPP/5RK1 b - - 0 1", true);
-
-        let pieces_info = crate::piece::constants::gen();
-        
-        let result = gen_best_move(true, &Instant::now(), &10000, 6, 0, 0, AlphaBeta::new(), &[[0i16; 64]; 12], board, &pieces_info);
-
-        let expected = Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 0,
-            },
-            final_piece_bit: 0,
-            value: 0,
-            heatmap_value: 0,
-        };
-
-        println!("{:?}", result);
-        assert_eq!(result.piece_move, Some(expected));
-    }
-    */
 }
