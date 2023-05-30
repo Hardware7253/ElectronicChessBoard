@@ -1,0 +1,1 @@
+/home/oxnh/Code/Rust/chess2/Code/chess2/target/thumbv7m-none-eabi/release/libchess2.rlib: /home/oxnh/Code/Rust/chess2/Code/chess2/src/algorithm.rs /home/oxnh/Code/Rust/chess2/Code/chess2/src/board.rs /home/oxnh/Code/Rust/chess2/Code/chess2/src/lib.rs /home/oxnh/Code/Rust/chess2/Code/chess2/src/piece.rs
