@@ -154,8 +154,95 @@ impl TeamBitboards {
 }
 
 pub mod embedded {
+    use super::*;
+
+    use embedded_hal::digital::v2::{InputPin, OutputPin};
+    use stm32f1xx_hal as hal;
+    use hal::gpio::{Pxx, PushPull, Output, Input, PullDown};
+    use hal::{pac, delay::Delay, prelude::*};
+
+    // Struct for shift register pins
+    pub struct ShiftRegister {
+        pub clock: Pxx<Output<PushPull>>, // Shift register serial clock pin
+        pub data: Pxx<Output<PushPull>>, // Shift register serial data pin
+        pub latch: Pxx<Output<PushPull>>, // Shift register data latch pin
+        pub bits: usize, // Shift register bits
+    }
+
+    impl ShiftRegister {
+        pub fn init(&mut self) {
+            self.clock.set_low().ok();
+            self.data.set_low().ok();
+            self.latch.set_low().ok();
+        }
+    }
+
     // Converts milliseconds to cpu clocks
     pub fn ms_to_clocks(millis: u32, clock_mhz: u32) -> u32 {
         millis * clock_mhz * 1000
+    }
+
+    // Writes low or high state to given pin
+    pub fn digital_write(pin: &mut Pxx<Output<PushPull>>, high: bool) {
+        if high {
+            pin.set_high().ok();
+            return;
+        }
+        pin.set_low().ok();
+    }
+
+    // Returns true if the given digital pin is high
+    pub fn pin_high(pin: &mut Pxx<Input<PullDown>>) -> bool {
+        if pin.is_high().unwrap() {
+            return true;
+        }
+        false
+    }
+    
+    // Shifts given number into a shift register
+    pub fn shift_out(shift_register: &mut ShiftRegister, delay: &mut Delay, num: u64, msbfirst: bool) {
+        for i in 0..shift_register.bits {
+            
+            // Write bit
+            if !msbfirst {
+                digital_write(&mut shift_register.data, bit_on(num, i)); 
+            } else {
+                digital_write(&mut shift_register.data, bit_on(num, (i as i16 - (shift_register.bits as i16 - 1)).abs().try_into().unwrap())); 
+            }
+            
+            delay.delay_us(1u32); // Data hold time
+
+            // Shift in bit with clock pulse
+            shift_register.clock.set_high().ok();
+            delay.delay_us(1u32);
+            shift_register.clock.set_low().ok();
+            delay.delay_us(1u32);
+        }
+
+        delay.delay_us(1u32); // Data hold time
+
+        // Latch data into internal output register
+        shift_register.latch.set_high().ok();
+        delay.delay_us(1u32);
+        shift_register.latch.set_low().ok();
+        delay.delay_us(1u32);
+    }
+
+    // Writes to the led/hall sensor grid shift registers
+    // Led/hall can be selected using a bitboard bit
+    pub fn write_grid(shift_register: &mut ShiftRegister, delay: &mut Delay, bit: usize, leds_on: bool) {
+        let grid_coordinates = bit_to_cartesian(bit as i8);
+
+        let mut shift_num: u64 = 0;
+        shift_num += grid_coordinates[1] as u64;      // The led y coordinate occupies bit 0,1,2 of the shift register
+        shift_num += (grid_coordinates[0] as u64) << 3; // The led x coordinate occupies bit 3,4,5 of the shift register
+
+        // The hall sensor x and y coordinates occupy the same bits but on the most significant shift register
+        shift_num += shift_num << 8;
+
+        // Set bit 7 high to disable leds
+        if !leds_on {
+            shift_num += 1 << 7;
+        }
     }
 }

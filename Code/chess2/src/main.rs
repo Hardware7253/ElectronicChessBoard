@@ -38,10 +38,10 @@ fn main() -> ! {
     let mut led = gpiob.pb7.into_push_pull_output(&mut gpiob.crl).downgrade();
 
     // Configure and apply clock configuration
-    let clock_mhz = 48;
+    let clock_mhz = 72;
     let clocks = rcc.cfgr
         // External oscillator
-        .use_hse(16.mhz())
+        .use_hse(8.mhz())
 
         // Bus and core clocks
         .hclk(clock_mhz.mhz())
@@ -89,12 +89,6 @@ fn main() -> ! {
 
     // Blink led
     loop {
-        led.set_high().ok();
-        rprintln!("Led on");
-        delay.delay_ms(1000u16);
 
-        led.set_low().ok();
-        rprintln!("Led off");
-        delay.delay_ms(1000u16);
     }
 }
