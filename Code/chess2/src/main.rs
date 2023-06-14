@@ -5,6 +5,7 @@ use panic_halt as _;
 
 use cortex_m_rt::entry;
 use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::v2::InputPin;
 use stm32f1xx_hal as hal;
 use hal::{pac, pac::DWT, pac::DCB, delay::Delay, prelude::*};
 
@@ -33,10 +34,6 @@ fn main() -> ! {
     // These pins have to be set like so: pb7.into_push_pull_output(&mut gpiob.crl);
     let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
 
-    // Initialize led pin
-    // When initializing pins use crl register for pins 0-7 and crh for pins 8-15
-    let mut led = gpiob.pb7.into_push_pull_output(&mut gpiob.crl).downgrade();
-
     // Configure and apply clock configuration
     let clock_mhz = 72;
     let clocks = rcc.cfgr
@@ -59,6 +56,40 @@ fn main() -> ! {
     cp.DCB.enable_trace();
     cp.DWT.enable_cycle_counter();
 
+    // Initialise hall and led grid shift register
+    let mut grid_sr = chess2::embedded::ShiftRegister {
+        clock: gpioa.pa3.into_push_pull_output(&mut gpioa.crl).downgrade(),
+        data: gpioa.pa5.into_push_pull_output(&mut gpioa.crl).downgrade(),
+        latch: gpioa.pa4.into_push_pull_output(&mut gpioa.crl).downgrade(),
+        bits: 16,
+    };
+    grid_sr.init();
+
+    // Initialise character lcd
+    let mut lcd = chess2::embedded::character_lcd::Lcd {
+        shift_register: chess2::embedded::ShiftRegister {
+            clock: gpiob.pb1.into_push_pull_output(&mut gpiob.crl).downgrade(),
+            data: gpioa.pa7.into_push_pull_output(&mut gpioa.crl).downgrade(),
+            latch: gpiob.pb0.into_push_pull_output(&mut gpiob.crl).downgrade(),
+            bits: 8,
+        },
+        register_select: gpiob.pb2.into_push_pull_output(&mut gpiob.crl).downgrade(),
+    };
+    lcd.init(&mut delay);
+
+    // Test character lcd
+    lcd.print(&mut delay, "Chess");
+    lcd.set_cursor(&mut delay, [0, 1]);
+    lcd.print(&mut delay, "Soon");
+
+    // Initialise input pins
+    let button = gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade();
+    let hall_sensor = gpiob.pb12.into_floating_input(&mut gpiob.crh).downgrade();
+
+    // Turn on led and select hall sensor at bitboard bit 0
+    chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, true);
+
+    /*
     // Initiliaze board to starting board
     let board = board_representation::Board {
         board: [71776119061217280, 9295429630892703744, 4755801206503243776, 2594073385365405696, 576460752303423488, 1152921504606846976, 65280, 129, 66, 36, 8, 16, 7926616819148718190],
@@ -86,9 +117,13 @@ fn main() -> ! {
     );
 
     rprintln!("{:?}", best_move);
+    */
 
-    // Blink led
     loop {
+        delay.delay_ms(10u16);
 
+        // Print wether or not the selected hall effect sensor is detecting a magnetic field
+        let hall_state = chess2::embedded::digital_read(&hall_sensor);
+        rprintln!("{}", !hall_state);
     }
 }

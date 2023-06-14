@@ -191,12 +191,22 @@ pub mod embedded {
         pin.set_low().ok();
     }
 
-    // Returns true if the given digital pin is high
-    pub fn pin_high(pin: &mut Pxx<Input<PullDown>>) -> bool {
-        if pin.is_high().unwrap() {
-            return true;
+    // Returns the state of the digital pin
+    pub fn digital_read<T: InputPin>(pin: &T) -> bool {
+        let state = pin.is_high();
+
+        match state {
+            Ok(high) => return high, // Return pin state
+            Err(_) => return false, // If there was an error assume the pin is low
         }
-        false
+    }
+
+    // Sets a pin high, waits micro_seconds, sets the pin low, waits micro_seconds
+    fn pulse_pin(pin: &mut Pxx<Output<PushPull>>, delay: &mut Delay, micro_seconds: u32) {
+        pin.set_high().ok();
+        delay.delay_us(micro_seconds);
+        pin.set_low().ok();
+        delay.delay_us(micro_seconds);
     }
     
     // Shifts given number into a shift register
@@ -212,20 +222,10 @@ pub mod embedded {
             
             delay.delay_us(1u32); // Data hold time
 
-            // Shift in bit with clock pulse
-            shift_register.clock.set_high().ok();
-            delay.delay_us(1u32);
-            shift_register.clock.set_low().ok();
-            delay.delay_us(1u32);
+            pulse_pin(&mut shift_register.clock, delay, 1); // Bit is shifted into the shift register with a clock pulse
         }
-
         delay.delay_us(1u32); // Data hold time
-
-        // Latch data into internal output register
-        shift_register.latch.set_high().ok();
-        delay.delay_us(1u32);
-        shift_register.latch.set_low().ok();
-        delay.delay_us(1u32);
+        pulse_pin(&mut shift_register.latch, delay, 1); // Latch data into internal output register
     }
 
     // Writes to the led/hall sensor grid shift registers
@@ -244,5 +244,116 @@ pub mod embedded {
         if !leds_on {
             shift_num += 1 << 7;
         }
+
+        shift_out(shift_register, delay, shift_num, true);
+    }
+
+    pub mod character_lcd {
+        use super::*;
+
+        pub struct Lcd {
+            pub shift_register: ShiftRegister,
+            pub register_select: Pxx<Output<PushPull>>,
+        }
+
+        // Instructions derived from various datasheets
+        // https://www.sparkfun.com/datasheets/LCD/ADM1602K-NSW-FBS-3.3v.pdf
+        // https://www.openhacks.com/uploadsproductos/eone-1602a1.pdf
+        // Non 1602 lcds might have different instructions, and definitely different ddram addresses
+        impl Lcd {
+
+            // Writes a byte to a character lcd, data_input sets register select pin
+            pub fn write(&mut self, delay: &mut Delay, data_input: bool, data: u8) {
+                digital_write(&mut self.register_select, data_input); // Set data_input / instruction input
+                
+                shift_out(&mut self.shift_register, delay, data as u64, true);
+
+                delay.delay_ms(1u32); // Ensure there is time inbetween character lcd writes
+            }
+
+            // Initialze character lcd
+            pub fn init(&mut self, delay: &mut Delay) {
+                self.shift_register.clock.set_low().ok();
+                self.shift_register.latch.set_low().ok();
+
+                self.write(delay, false, 0b00111000); // Initialize lcd with 8-bit bus, 2 lines, and 5x8 dot format
+
+                self.clear(delay); // Clear dispaly
+                self.home(delay);  // Home cursor
+                self.power(delay, true, false, false); // Power on display, and hide the cursor
+            }
+
+            // Turn on/off display, cursor, and cursor position
+            pub fn power(&mut self, delay: &mut Delay, display_on: bool, cursor_on: bool, cursor_position_on: bool) {
+                let mut write_byte: u8 = 8;
+
+                if display_on {
+                    write_byte += 4;
+                }
+
+                if cursor_on {
+                    write_byte += 2;
+                }
+
+                if cursor_position_on {
+                    write_byte += 1;
+                }
+
+                self.write(delay, false, write_byte);
+            }
+
+            // Clear display
+            pub fn clear(&mut self, delay: &mut Delay) {
+                self.write(delay, false, 0b00000001);
+            }
+
+            // Home cursor
+            pub fn home(&mut self, delay: &mut Delay) {
+                self.write(delay, false, 0b00000010);
+            }
+
+            // Shift cursor/display once in the specified direction
+            pub fn shift(&mut self, delay: &mut Delay, shift_display: bool, shift_right: bool) {
+                let mut write_byte: u8 = 0b00010000;
+
+                if shift_display {
+                    write_byte += 0b00001000;
+                }
+
+                if shift_right {
+                    write_byte += 0b00000100;
+                }
+
+                self.write(delay, false, write_byte);
+            }
+
+            // Sets ddram (cursor) address
+            pub fn set_ddram(&mut self, delay: &mut Delay, ddram_address: u8) {
+                let mut write_byte: u8 = 0b10000000;
+                write_byte ^= ddram_address;
+
+                self.write(delay, false, write_byte);
+            }
+
+            // Sets the cursor position with cartesian coordinates
+            pub fn set_cursor(&mut self, delay: &mut Delay, new_position: [u8; 2]) {
+                // Character lcds that aren't a 1602 will have different and more/less ddram addresses
+                let ddram_addresses: [[u8; 16]; 2] = [
+                    [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F],
+                    [0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F],
+                ];
+                
+                let address = ddram_addresses[new_position[1] as usize][new_position[0] as usize];
+                self.set_ddram(delay, address);
+            }
+
+            // Prints a string to the lcd
+            pub fn print(&mut self, delay: &mut Delay, string: &str) {
+                for c in string.chars() {
+                    self.write(delay, true, c as u8);
+                }
+            }
+        }
+
     }
 }
