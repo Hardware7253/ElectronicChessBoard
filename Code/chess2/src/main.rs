@@ -30,10 +30,6 @@ fn main() -> ! {
     let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
 
-    // Disable jtag so pa15, pb3, and pb4 can be used
-    // These pins have to be set like so: pb7.into_push_pull_output(&mut gpiob.crl);
-    let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
-
     // Configure and apply clock configuration
     let clock_mhz = 72;
     let clocks = rcc.cfgr
@@ -63,7 +59,8 @@ fn main() -> ! {
         latch: gpioa.pa4.into_push_pull_output(&mut gpioa.crl).downgrade(),
         bits: 16,
     };
-    grid_sr.init();
+    grid_sr.init(&mut delay);
+    chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, false); // Initialise grid with leds off
 
     // Initialise character lcd
     let mut lcd = chess2::embedded::character_lcd::Lcd {
@@ -87,7 +84,7 @@ fn main() -> ! {
     let hall_sensor = gpiob.pb12.into_floating_input(&mut gpiob.crh).downgrade();
 
     // Turn on led and select hall sensor at bitboard bit 0
-    chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, true);
+    //chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, true);
 
     /*
     // Initiliaze board to starting board
@@ -120,10 +117,10 @@ fn main() -> ! {
     */
 
     loop {
-        delay.delay_ms(10u16);
+        delay.delay_ms(100u16);
 
         // Print wether or not the selected hall effect sensor is detecting a magnetic field
-        let hall_state = chess2::embedded::digital_read(&hall_sensor);
-        rprintln!("{}", !hall_state);
+        let bitboard = chess2::embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay);
+        rprintln!("{}", bitboard);
     }
 }

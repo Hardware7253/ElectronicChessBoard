@@ -170,10 +170,31 @@ pub mod embedded {
     }
 
     impl ShiftRegister {
-        pub fn init(&mut self) {
+        pub fn init(&mut self, delay: &mut Delay) {
             self.clock.set_low().ok();
             self.data.set_low().ok();
             self.latch.set_low().ok();
+
+            self.shift_out(delay, 0, true);
+        }
+
+        // Shifts given number into a shift register
+        fn shift_out(&mut self, delay: &mut Delay, num: u64, msbfirst: bool) {
+            for i in 0..self.bits {
+                
+                // Write bit
+                if !msbfirst {
+                    digital_write(&mut self.data, bit_on(num, i)); 
+                } else {
+                    digital_write(&mut self.data, bit_on(num, (i as i16 - (self.bits as i16 - 1)).abs().try_into().unwrap())); 
+                }
+                
+                delay.delay_us(1u32); // Data hold time
+
+                pulse_pin(&mut self.clock, delay, 1); // Bit is shifted into the shift register with a clock pulse
+            }
+            delay.delay_us(1u32); // Data hold time
+            pulse_pin(&mut self.latch, delay, 1); // Latch data into internal output register
         }
     }
 
@@ -209,25 +230,6 @@ pub mod embedded {
         delay.delay_us(micro_seconds);
     }
     
-    // Shifts given number into a shift register
-    pub fn shift_out(shift_register: &mut ShiftRegister, delay: &mut Delay, num: u64, msbfirst: bool) {
-        for i in 0..shift_register.bits {
-            
-            // Write bit
-            if !msbfirst {
-                digital_write(&mut shift_register.data, bit_on(num, i)); 
-            } else {
-                digital_write(&mut shift_register.data, bit_on(num, (i as i16 - (shift_register.bits as i16 - 1)).abs().try_into().unwrap())); 
-            }
-            
-            delay.delay_us(1u32); // Data hold time
-
-            pulse_pin(&mut shift_register.clock, delay, 1); // Bit is shifted into the shift register with a clock pulse
-        }
-        delay.delay_us(1u32); // Data hold time
-        pulse_pin(&mut shift_register.latch, delay, 1); // Latch data into internal output register
-    }
-
     // Writes to the led/hall sensor grid shift registers
     // Led/hall can be selected using a bitboard bit
     pub fn write_grid(shift_register: &mut ShiftRegister, delay: &mut Delay, bit: usize, leds_on: bool) {
@@ -245,7 +247,24 @@ pub mod embedded {
             shift_num += 1 << 7;
         }
 
-        shift_out(shift_register, delay, shift_num, true);
+        shift_register.shift_out(delay, shift_num, true);
+    }
+
+    // Reads all hall effect sensors on the board, and returns a bitboard
+    pub fn read_board_halls<T: InputPin>(shift_register: &mut ShiftRegister, hall_sensor: &T, delay: &mut Delay) -> u64 {
+        let mut bitboard = 0;
+        
+        for i in 0..64 {
+            write_grid(shift_register, delay, i, false); // Select hall effect sensor to read
+            let magnet_detected = !digital_read(hall_sensor); // Read hall effect sensor
+
+            // If the hall effect sensor is detecting a magenetic field then turn it's bit on
+            if magnet_detected {
+                bitboard |= 1 << i;
+            }
+        }
+
+        bitboard
     }
 
     pub mod character_lcd {
@@ -266,7 +285,7 @@ pub mod embedded {
             pub fn write(&mut self, delay: &mut Delay, data_input: bool, data: u8) {
                 digital_write(&mut self.register_select, data_input); // Set data_input / instruction input
                 
-                shift_out(&mut self.shift_register, delay, data as u64, true);
+                self.shift_register.shift_out(delay, data as u64, true);
 
                 delay.delay_ms(1u32); // Ensure there is time inbetween character lcd writes
             }
@@ -354,6 +373,5 @@ pub mod embedded {
                 }
             }
         }
-
     }
 }
