@@ -159,7 +159,9 @@ pub mod embedded {
     use embedded_hal::digital::v2::{InputPin, OutputPin};
     use stm32f1xx_hal as hal;
     use hal::gpio::{Pxx, PushPull, Output, Input, PullDown};
-    use hal::{pac, delay::Delay, prelude::*};
+    use hal::{pac, pac::DWT, delay::Delay, prelude::*};
+
+    use rtt_target::{rprintln, rtt_init_print};
 
     // Struct for shift register pins
     pub struct ShiftRegister {
@@ -199,7 +201,7 @@ pub mod embedded {
     }
 
     // Converts milliseconds to cpu clocks
-    pub fn ms_to_clocks(millis: u32, clock_mhz: u32) -> u32 {
+    pub fn ms_to_clocks(millis: u64, clock_mhz: u64) -> u64 {
         millis * clock_mhz * 1000
     }
 
@@ -267,12 +269,89 @@ pub mod embedded {
         bitboard
     }
 
+    pub mod cycle_counter {
+        use super::*;
+
+        #[derive(Debug)]
+        pub struct Counter {
+            pub cycles: u64, // Total cycle count
+            pub cycle_resets: u32, // Number of times the DWT cycle count has rolled over
+            pub last_cycle_count: u32, // Last DWT cycle count
+        }
+
+        impl Counter {
+            pub fn new() -> Self {
+                Counter {
+                    cycles: 0,
+                    cycle_resets: 0,
+                    last_cycle_count: 0,
+                }
+            }
+
+            pub fn update(&mut self) {
+                let dwt_cycles = DWT::cycle_count();
+
+                // When the DWT cycle count resets increment cycle_resets
+                if dwt_cycles < self.last_cycle_count {
+                    self.cycle_resets += 1; 
+                }
+                self.last_cycle_count = dwt_cycles;
+
+                self.cycles = (self.cycle_resets * u32::MAX) as u64 + dwt_cycles as u64; // Update cycle count
+            }
+        }
+    }
+
+    pub mod button {
+        use super::*;
+
+        pub struct Button {
+            pub pin: Pxx<Input<PullDown>>, // Button pin
+            pub last_press_cycle: u64, // Processor cycles elapsed when the button was last pressed
+            pub debounce_cycles: u64, // Minimum number of processor cycles between button pressed
+            pub sequential_cycles: u64, // After this many cycles have elapsed between the last button press and current button press the press is no longer sequential
+            pub s_presses: u8, 
+            pub sequential_presses: u8, // Number of presses that have been made in quick succesion
+        }
+
+        impl Button {
+
+            // Returns true only when the button is pressed, so true will not be returned when the button is held down or bouncing
+            // This functionality is dependant on the buttons debounce_cycles
+            pub fn press(&mut self, counter: &mut cycle_counter::Counter) -> bool {
+                counter.update();
+
+                let mut pressed = false;
+                if digital_read(&self.pin) {
+                    
+                    // Return true if the button has been pressed and isn't bouncing
+                    if counter.cycles > (self.last_press_cycle + self.debounce_cycles) {
+                        pressed = true;
+                    }
+                    self.last_press_cycle = counter.cycles;
+                }
+
+                // Detect sequential presses
+                if (counter.cycles - self.last_press_cycle) < self.sequential_cycles {
+                    if pressed {
+                        self.s_presses += 1;
+                    }
+                } else {
+                    self.sequential_presses = self.s_presses;
+                    self.s_presses = 0;
+                }
+
+                pressed
+            }
+        }
+    }
+
     pub mod character_lcd {
         use super::*;
 
         pub struct Lcd {
-            pub shift_register: ShiftRegister,
-            pub register_select: Pxx<Output<PushPull>>,
+            pub shift_register: ShiftRegister, // Shift register connecting to character lcd
+            pub register_select: Pxx<Output<PushPull>>, // Register select pin
         }
 
         // Instructions derived from various datasheets

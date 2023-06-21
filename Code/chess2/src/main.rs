@@ -15,6 +15,7 @@ use rtt_target::{rprintln, rtt_init_print};
 fn main() -> ! {
     use chess2::board::board_representation;
     use chess2::algorithm;
+    use chess2::embedded;
 
     // Init buffers for debug printing
     rtt_init_print!();
@@ -52,19 +53,21 @@ fn main() -> ! {
     cp.DCB.enable_trace();
     cp.DWT.enable_cycle_counter();
 
+    let mut cycle_counter = embedded::cycle_counter::Counter::new();
+
     // Initialise hall and led grid shift register
-    let mut grid_sr = chess2::embedded::ShiftRegister {
+    let mut grid_sr = embedded::ShiftRegister {
         clock: gpioa.pa3.into_push_pull_output(&mut gpioa.crl).downgrade(),
         data: gpioa.pa5.into_push_pull_output(&mut gpioa.crl).downgrade(),
         latch: gpioa.pa4.into_push_pull_output(&mut gpioa.crl).downgrade(),
         bits: 16,
     };
     grid_sr.init(&mut delay);
-    chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, false); // Initialise grid with leds off
+    embedded::write_grid(&mut grid_sr, &mut delay, 0, false); // Initialise grid with leds off
 
     // Initialise character lcd
-    let mut lcd = chess2::embedded::character_lcd::Lcd {
-        shift_register: chess2::embedded::ShiftRegister {
+    let mut lcd = embedded::character_lcd::Lcd {
+        shift_register: embedded::ShiftRegister {
             clock: gpiob.pb1.into_push_pull_output(&mut gpiob.crl).downgrade(),
             data: gpioa.pa7.into_push_pull_output(&mut gpioa.crl).downgrade(),
             latch: gpiob.pb0.into_push_pull_output(&mut gpiob.crl).downgrade(),
@@ -79,9 +82,16 @@ fn main() -> ! {
     lcd.set_cursor(&mut delay, [0, 1]);
     lcd.print(&mut delay, "Soon");
 
-    // Initialise input pins
-    let button = gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade();
-    let hall_sensor = gpiob.pb12.into_floating_input(&mut gpiob.crh).downgrade();
+    let hall_sensor = gpiob.pb12.into_floating_input(&mut gpiob.crh).downgrade(); // Pin to read value of the selected hall sensor
+
+    let mut button = embedded::button::Button {
+        pin: gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade(),
+        last_press_cycle: 0,
+        debounce_cycles: embedded::ms_to_clocks(80, clock_mhz as u64), // 80ms debounce
+        sequential_cycles: embedded::ms_to_clocks(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
+        s_presses: 0,
+        sequential_presses: 0, 
+    };
 
     // Turn on led and select hall sensor at bitboard bit 0
     //chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, true);
@@ -119,8 +129,8 @@ fn main() -> ! {
     loop {
         delay.delay_ms(100u16);
 
-        // Print wether or not the selected hall effect sensor is detecting a magnetic field
-        let bitboard = chess2::embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay);
-        rprintln!("{}", bitboard);
+        let bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Get bitboard of pieces on the physical board
+
+        button.press(&mut cycle_counter);
     }
 }

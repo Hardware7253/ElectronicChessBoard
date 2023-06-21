@@ -66,8 +66,9 @@ pub fn update_alpha_beta(my_alpha_beta: &mut AlphaBeta, child_alpha_beta: &Alpha
 
 pub fn gen_best_move(
     master_team: bool,
-    start_cycles: &u32,
-    max_elapsed_cycles: &u32,
+    cycle_counter: &mut crate::embedded::cycle_counter::Counter,
+    start_cycles: &u64,
+    max_elapsed_cycles: &u64,
     search_depth: usize,
     current_depth: usize,
     init_value: i8,
@@ -82,7 +83,8 @@ pub fn gen_best_move(
 
     // If current depth and search depth are equal stop searching down the move tree
     // Or stop searching if the time elapsed is greater than the maximum allowed time
-    if current_depth == search_depth || DWT::cycle_count() > start_cycles + max_elapsed_cycles {
+    cycle_counter.update();
+    if current_depth == search_depth || cycle_counter.cycles > start_cycles + max_elapsed_cycles {
         return AlphaBeta {
             alpha: init_value,
             beta: init_value,
@@ -126,6 +128,7 @@ pub fn gen_best_move(
     if current_depth == 0 && search_depth > 1 {
         let alpha_beta = gen_best_move(
             true,
+            cycle_counter,
             start_cycles,
             max_elapsed_cycles,
             search_depth - 1,
@@ -165,6 +168,7 @@ pub fn gen_best_move(
 
                 let mut child_alpha_beta = gen_best_move(
                     !master_team,
+                    cycle_counter,
                     start_cycles,
                     max_elapsed_cycles,
                     search_depth,
@@ -231,7 +235,7 @@ pub fn gen_best_move(
 
     // If the time exceeded the maximum allowed time return the pv move from a lower search depth
     if current_depth == 0 && search_depth > 1 {
-        if DWT::cycle_count() > start_cycles + max_elapsed_cycles {
+        if cycle_counter.cycles > start_cycles + max_elapsed_cycles {
             return pv_alpha_beta.unwrap();
         }
     }
