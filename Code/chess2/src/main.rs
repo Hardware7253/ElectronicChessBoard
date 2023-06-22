@@ -88,9 +88,9 @@ fn main() -> ! {
         pin: gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade(),
         last_press_cycle: 0,
         debounce_cycles: embedded::ms_to_clocks(80, clock_mhz as u64), // 80ms debounce
-        sequential_cycles: embedded::ms_to_clocks(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
-        s_presses: 0,
-        sequential_presses: 0, 
+        consecutive_cycles: embedded::ms_to_clocks(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
+        c_presses: 0,
+        consecutive_presses: 0, 
     };
 
     // Turn on led and select hall sensor at bitboard bit 0

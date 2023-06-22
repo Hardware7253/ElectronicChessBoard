@@ -309,9 +309,9 @@ pub mod embedded {
             pub pin: Pxx<Input<PullDown>>, // Button pin
             pub last_press_cycle: u64, // Processor cycles elapsed when the button was last pressed
             pub debounce_cycles: u64, // Minimum number of processor cycles between button pressed
-            pub sequential_cycles: u64, // After this many cycles have elapsed between the last button press and current button press the press is no longer sequential
-            pub s_presses: u8, 
-            pub sequential_presses: u8, // Number of presses that have been made in quick succesion
+            pub consecutive_cycles: u64, // After this many cycles have elapsed between the last button press and current button press the press is no longer sequential
+            pub c_presses: u8, // Number of presses that have been made in quick succesion, updated during the consecutive presses
+            pub consecutive_presses: u8, // Number of presses that have been made in quick succesion, updated after the consecutive presses
         }
 
         impl Button {
@@ -332,13 +332,13 @@ pub mod embedded {
                 }
 
                 // Detect sequential presses
-                if (counter.cycles - self.last_press_cycle) < self.sequential_cycles {
+                if (counter.cycles - self.last_press_cycle) < self.consecutive_cycles {
                     if pressed {
-                        self.s_presses += 1;
+                        self.c_presses += 1;
                     }
                 } else {
-                    self.sequential_presses = self.s_presses;
-                    self.s_presses = 0;
+                    self.consecutive_presses = self.c_presses;
+                    self.c_presses = 0;
                 }
 
                 pressed
