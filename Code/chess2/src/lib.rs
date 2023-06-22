@@ -200,8 +200,8 @@ pub mod embedded {
         }
     }
 
-    // Converts milliseconds to cpu clocks
-    pub fn ms_to_clocks(millis: u64, clock_mhz: u64) -> u64 {
+    // Converts milliseconds to clock cycles
+    pub fn ms_to_cycles(millis: u64, clock_mhz: u64) -> u64 {
         millis * clock_mhz * 1000
     }
 

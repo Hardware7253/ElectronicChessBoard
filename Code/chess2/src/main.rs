@@ -77,18 +77,13 @@ fn main() -> ! {
     };
     lcd.init(&mut delay);
 
-    // Test character lcd
-    lcd.print(&mut delay, "Chess");
-    lcd.set_cursor(&mut delay, [0, 1]);
-    lcd.print(&mut delay, "Soon");
-
     let hall_sensor = gpiob.pb12.into_floating_input(&mut gpiob.crh).downgrade(); // Pin to read value of the selected hall sensor
 
     let mut button = embedded::button::Button {
         pin: gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade(),
         last_press_cycle: 0,
-        debounce_cycles: embedded::ms_to_clocks(80, clock_mhz as u64), // 80ms debounce
-        consecutive_cycles: embedded::ms_to_clocks(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
+        debounce_cycles: embedded::ms_to_cycles(80, clock_mhz as u64), // 80ms debounce
+        consecutive_cycles: embedded::ms_to_cycles(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
         c_presses: 0,
         consecutive_presses: 0, 
     };
@@ -113,7 +108,7 @@ fn main() -> ! {
     let best_move = algorithm::gen_best_move(
         true,
         &DWT::cycle_count(),
-        &chess2::embedded::ms_to_clocks(1000, clock_mhz),
+        &chess2::embedded::ms_to_cycles(1000, clock_mhz),
         6,
         0,
         0,
@@ -126,11 +121,44 @@ fn main() -> ! {
     rprintln!("{:?}", best_move);
     */
 
+    let bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Get bitboard of pieces on the physical board
+
     loop {
-        delay.delay_ms(100u16);
+        delay.delay_ms(10u16);
 
-        let bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Get bitboard of pieces on the physical board
+        // Get player team
+        let mut player_white = true;
+        {
+            let mut game_started = false;
+            
 
-        button.press(&mut cycle_counter);
+            let mut team_message_start_cycle = 0; // The clock cycle the current team select message started getting displayed at
+            let team_message_cycles = embedded::ms_to_cycles(1000, clock_mhz as u64); // How many clock cycles the game start message should be displayed for before switching to the oposite team
+
+            while !game_started {
+
+                // Display start game message for white and black
+                lcd.set_cursor(&mut delay, [0, 0]);
+                if player_white {
+                    lcd.print(&mut delay, "Start as white?");
+                } else {
+                    lcd.print(&mut delay, "Start as black?");                
+                }
+                lcd.set_cursor(&mut delay, [0, 1]);
+                lcd.print(&mut delay, "(Press button)");
+
+
+                if button.press(&mut cycle_counter) {
+                    game_started = true;
+                }
+
+                if cycle_counter.cycles > team_message_start_cycle + team_message_cycles {
+                    team_message_start_cycle = cycle_counter.cycles;
+                    player_white = !player_white;
+                }
+            }
+        }
+
+        rprintln!("{}", player_white);
     }
 }
