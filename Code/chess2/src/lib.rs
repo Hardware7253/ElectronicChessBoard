@@ -96,6 +96,17 @@ pub fn bit_on(num: u64, bit: usize) -> bool {
     false
 }
 
+// Returns the number of bits on in the given number
+pub fn bits_on(num: u64) -> usize {
+    let mut bits_on = 0;
+    for i in 0..64 {
+        if bit_on(num, i) {
+            bits_on += 1;
+        }
+    }
+    bits_on
+}
+
 // Function returns when it finds what bit is on in a u64 number
 // E.g. 8 would return 3
 // If no bits are on in the number then default will be returned
@@ -121,6 +132,66 @@ pub fn common_bit(num1: u64, num2: u64) -> bool {
 pub fn flip_bitboard_bit(bit: usize) -> usize {
     let flipped = bit as i8 - 63;
     flipped.abs().try_into().unwrap()
+}
+
+#[derive(PartialEq, Debug)]
+pub struct PieceMove {
+    pub piece: board::board_representation::BoardCoordinates,
+    pub piece_move_bit: usize,
+}
+
+impl PieceMove {
+    pub fn new() -> Self {
+        PieceMove {
+            piece: board::board_representation::BoardCoordinates::new(),
+            piece_move_bit: 0,
+        }
+    }
+}
+
+// Finds a piece that has moved given a final and initial bitboard
+// Returns an error if more than one piece was moved
+pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board) -> Result<PieceMove, ()> {
+    
+    // Return an error if pieces were removed from the board
+    if bits_on(init_bitboard) != bits_on(final_bitboard) {
+        return Err(());
+    }
+
+    let change_bitboard = init_bitboard ^ final_bitboard; // Bitboard of the bits that have changed from the initial to final bitboard
+
+    let mut changed_bits = 0; // Stores the number of bits that have been changed from the inital to final bitboard
+
+    let mut piece_move = PieceMove {
+        piece: board::board_representation::BoardCoordinates {board_index: 0, bit: 0},
+        piece_move_bit: 0,
+    };
+
+    for i in 0..64 {
+        if bit_on(change_bitboard, i) {
+            changed_bits += 1;
+
+            if bit_on(init_bitboard, i) {
+                piece_move.piece.bit = i; // Get initial piece bit
+            } else {
+                piece_move.piece_move_bit = i; // Get final piece bit
+            }
+        }
+    }
+
+    // Return an error if multiple pieces moved, or no pieces moved
+    if changed_bits != 2 {
+        return Err(());
+    }
+
+    // Find the board index of the piece
+    for i in 0..init_board.board.len() {
+        if bit_on(init_board.board[i], piece_move.piece.bit) {
+            piece_move.piece.board_index = i;
+        }
+    }
+
+    Ok(piece_move)
 }
 
 // A struct containing bitboards which have the locations of all pieces on the friendly and enemy team
@@ -238,8 +309,8 @@ pub mod embedded {
         let grid_coordinates = bit_to_cartesian(bit as i8);
 
         let mut shift_num: u64 = 0;
-        shift_num += grid_coordinates[1] as u64;      // The led y coordinate occupies bit 0,1,2 of the shift register
-        shift_num += (grid_coordinates[0] as u64) << 3; // The led x coordinate occupies bit 3,4,5 of the shift register
+        shift_num += grid_coordinates[1] as u64; // The led y coordinate occupies bits 0,1,2 of the shift register
+        shift_num += (grid_coordinates[0] as u64) << 3; // The led x coordinate occupies bits 3,4,5 of the shift register
 
         // The hall sensor x and y coordinates occupy the same bits but on the most significant shift register
         shift_num += shift_num << 8;
@@ -250,6 +321,18 @@ pub mod embedded {
         }
 
         shift_register.shift_out(delay, shift_num, true);
+    }
+
+    // Turns on leds on the board according to the given bitboard
+    // Simulates turning multiple leds on simultaneously by turning them off and on in quick succesion
+    pub fn leds_from_bitboard(shift_register: &mut ShiftRegister, delay: &mut Delay, bitboard: u64, led_on_time_us: u32) {
+        for i in 0..64 {
+            if bit_on(bitboard, i) {
+                write_grid(shift_register, delay, i, true); // Turn led on
+                delay.delay_us(led_on_time_us);
+                write_grid(shift_register, delay, i, false); // Turn led off
+            }
+        }
     }
 
     // Reads all hall effect sensors on the board, and returns a bitboard

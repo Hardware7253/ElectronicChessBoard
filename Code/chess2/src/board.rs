@@ -28,6 +28,17 @@ pub mod board_representation {
     // Black king = 11
 
     // Last bitboard (index 12) is for moves (0 for moved 0 times, 1 for moved > 0 times)
+
+    // Layout of one bitboard
+    // The top left square is bit 0 and the bottom right square is bit 63
+    // y is flipped for easier math throughout the program
+    // Snakes likes this
+    //   0 | 0, 1, 2
+    //   1 | 3, 4, 5
+    //   2 | 6, 7, 8
+    //   y |--------
+    //     x 0, 1, 2
+    // Bitboards do not need to be flipped to perspective of moving team
     
     #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct Board {
@@ -43,20 +54,18 @@ pub mod board_representation {
     // Coordinates used to reference a single piece on the board
     #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct BoardCoordinates {
-        pub board_index: usize,
-        pub bit: usize,
+        pub board_index: usize, // Index of a board array the piece occupies
+        pub bit: usize, // Bit the piece occupies
     }
 
-    // Layout of one bitboard
-    // The top left square is bit 0 and the bottom right square is bit 63
-    // y is flipped for easier math throughout the program
-    // Snakes likes this
-    //   0 | 0, 1, 2
-    //   1 | 3, 4, 5
-    //   2 | 6, 7, 8
-    //   y |--------
-    //     x 0, 1, 2
-    // Bitboards do not need to be flipped to perspective of moving team
+    impl BoardCoordinates {
+        pub fn new() -> Self {
+            BoardCoordinates {
+                board_index: 0,
+                bit: 0,
+            }
+        }
+    }
 
     impl Board {
 
@@ -75,7 +84,8 @@ pub mod board_representation {
                 en_passant_target: None,
             }
         }
-    }}
+    }
+}
 
 pub mod move_generator {
     use super::*;

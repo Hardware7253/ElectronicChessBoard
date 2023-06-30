@@ -19,10 +19,7 @@ pub struct Move {
 impl Move {
     pub fn new() -> Self {
         Move {
-            initial_piece_coordinates: board_representation::BoardCoordinates {
-                board_index: 0,
-                bit: 0,
-            },
+            initial_piece_coordinates: board_representation::BoardCoordinates::new(),
             final_piece_bit: 0,
             value: 0,
             heatmap_value: 0,

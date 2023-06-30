@@ -13,7 +13,7 @@ pub mod constants {
     }
 
     pub fn gen() -> [PieceInfo; 12] {
-        // How much the piece index changes when a move is made in a direction
+        // How much the piece bitboard bit changes when a move is made in a direction
         const KNIGHT_MOVES: [i8; 8] = [-17, -15, -6, 10, 17, 15, 6, -10];
         const STRAIGHT_MOVES: [i8; 8] = [-8, 1, 8, -1, 0, 0, 0, 0];
         const DIAGONAL_MOVES: [i8; 8] = [-9, -7, 9, 7, 0, 0, 0, 0];
