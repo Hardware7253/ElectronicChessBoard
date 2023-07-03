@@ -84,6 +84,18 @@ pub mod board_representation {
                 en_passant_target: None,
             }
         }
+
+        // Converts the entire board into a single bitboard
+        pub fn to_bitboard(&self) -> u64 {
+            let mut bitboard = 0;
+
+            // Only use first 12 bitboards as they correspond to piece positions
+            for i in 0..12 {
+                bitboard |= self.board[i];
+            }
+
+            bitboard
+        }
     }
 }
 

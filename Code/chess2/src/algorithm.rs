@@ -25,6 +25,13 @@ impl Move {
             heatmap_value: 0,
         }
     }
+
+    pub fn flip(mut self) -> Self {
+        self.initial_piece_coordinates.bit = crate::flip_bitboard_bit(self.initial_piece_coordinates.bit);
+        self.final_piece_bit = crate::flip_bitboard_bit(self.final_piece_bit);
+
+        self
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

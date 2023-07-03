@@ -1,0 +1,4 @@
+cargo:rustc-link-lib=static=cortex-m
+cargo:rustc-link-search=/home/oxnh/Code/Rust/ElectronicChessBoard/Code/chess2/target/thumbv7m-none-eabi/debug/build/cortex-m-87311b9d1e69d076/out
+cargo:rustc-cfg=cortex_m
+cargo:rustc-cfg=armv7m

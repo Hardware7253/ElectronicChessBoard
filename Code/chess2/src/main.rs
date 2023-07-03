@@ -16,8 +16,6 @@ use chess2::board::board_representation;
 use chess2::algorithm;
 use chess2::embedded;
 
-const led_error_strobe_us: u32 = 30000; // How long to pulse each led during a board setup or piece move error
-
 #[entry]
 fn main() -> ! {
     // Init buffers for debug printing
@@ -105,24 +103,15 @@ fn main() -> ! {
         en_passant_target: None
     };
 
-    let pieces_info = chess2::piece::constants::gen();
+    //rprintln!("{}", starting_board.to_bitboard());
 
-    /*
-    let best_move = algorithm::gen_best_move(
-        true,
-        &DWT::cycle_count(),
-        &chess2::embedded::ms_to_cycles(1000, clock_mhz),
-        6,
-        0,
-        0,
-        algorithm::AlphaBeta::new(),
-        &[[0i16; 64]; 12],
-        board,
-        &pieces_info,
-    );
-    */
+    let pieces_info = chess2::piece::constants::gen(); // Generate piece info
 
-    
+    let led_error_strobe_us: u32 = 30000; // How long to pulse each led during a board setup or piece move error
+    let mut max_search_ms: u64 = 1000; // Maximum time allowed for the computer to make a move
+    let max_search_depth = 6; // Maximum minimax search depth
+
+    let mut opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
     loop {
         delay.delay_ms(1u16);
@@ -184,8 +173,6 @@ fn main() -> ! {
             }
         }
 
-        lcd.clear(&mut delay);
-
         // Initialise board
         let mut board = starting_board;
 
@@ -193,9 +180,17 @@ fn main() -> ! {
         // Each loop represents one turn
         // The loop will break once the game has finished
         loop {
+            lcd.clear(&mut delay);
+
             let players_turn = player_white == board.whites_move; // Determine wether the current turn is for the player or computer to make
 
-            let mut piece_move = chess2::PieceMove::new();
+            // Piece move for the chess engine and the physical board must be stored seperately
+            // Because the physical board has a dynamic orientation for the teams, while the internal engine board representation has a static orientation for the white and black team perspective
+            let mut piece_internal_move = algorithm::Move::new();
+            let mut piece_physical_move = algorithm::Move::new();
+
+            physical_bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Get bitboard of pieces on the physical board before a piece has been moved
+            let mut physcial_bitboard_pm: u64 = 0; // Bitboard of pieces on the physical board after a piece has been moved
 
             // Get move from player / computer
             if players_turn {
@@ -216,7 +211,8 @@ fn main() -> ! {
 
                             // If the move was ok break the loop
                             Ok(player_move) => {
-                                piece_move = player_move;
+                                piece_physical_move = player_move;
+                                physcial_bitboard_pm = new_physical_bitboard;
                                 break;
                             },
 
@@ -228,7 +224,7 @@ fn main() -> ! {
                                 lcd.set_cursor(&mut delay, [0, 1]);
                                 lcd.print(&mut delay, "Please revert");
 
-                                move_error(physical_bitboard, new_physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                                show_move(physical_bitboard, new_physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
                                 lcd.clear(&mut delay);
                             },
                         }                        
@@ -239,11 +235,145 @@ fn main() -> ! {
                 lcd.print(&mut delay, "Computers turn");
                 lcd.set_cursor(&mut delay, [0, 1]);
                 lcd_print_team(&mut lcd, &mut delay, !player_white);
+
+                cycle_counter.update();
+                let start_cycles = cycle_counter.cycles;
+
+                // Generate a move which takes no longer than max_search_ms and has a maximum search depth of max_search_depth
+                piece_internal_move = algorithm::gen_best_move(
+                    true,
+                    &mut cycle_counter,
+                    &start_cycles,
+                    &chess2::embedded::ms_to_cycles(max_search_ms, clock_mhz as u64),
+                    max_search_depth,
+                    0,
+                    0,
+                    algorithm::AlphaBeta::new(),
+                    //&[[0i16; 64]; 12],
+                    &opening_heatmap,
+                    board,
+                    &pieces_info,
+                ).piece_move.unwrap();
+                
+            }
+            
+            // Set piece_internal / piece_physical move (whichever hasn't been updated yet)
+            if player_white {
+
+                // When the player is white the physical and internal boards are the same orientation so nothing needs to be flipped
+                if players_turn {
+                    piece_internal_move = piece_physical_move;
+                } else {
+                    piece_physical_move = piece_internal_move;
+                }
+            } else {
+
+                // When the player is black the physical and internal boards are opposite orientations so the moves have to flipped
+                if players_turn {
+                    piece_internal_move = piece_physical_move.flip();
+                    piece_internal_move.initial_piece_coordinates.board_index = chess2::find_board_index(&board, piece_internal_move.initial_piece_coordinates.bit).unwrap(); // Update board index
+                } else {
+                    piece_physical_move = piece_internal_move.flip();
+                } 
             }
 
-            
+            // Get friendly and enemy kings
+            let friendly_king_index;
+            let enemy_king_index;
+            if board.whites_move {
+                friendly_king_index = 5;
+                enemy_king_index = 11;
+            } else {
+                friendly_king_index = 11;
+                enemy_king_index = 5;
+            }
 
-            lcd.clear(&mut delay);
+            let friendly_king = board_representation::BoardCoordinates {
+                board_index: friendly_king_index,
+                bit: chess2::find_bit_on(board.board[friendly_king_index], 0),
+            };
+
+            let enemy_king = board_representation::BoardCoordinates {
+                board_index: enemy_king_index,
+                bit: chess2::find_bit_on(board.board[enemy_king_index], 0),
+            };
+
+            use chess2::board::move_generator;
+            use move_generator::TurnError;
+
+            // Get new board after turn has been made
+            let team_bitboards = chess2::TeamBitboards::new(friendly_king.board_index, &board);
+            let enemy_attacks = move_generator::gen_enemy_attacks(&friendly_king, team_bitboards, &board, &pieces_info);
+            let new_turn_board = move_generator::new_turn(&piece_internal_move.initial_piece_coordinates, piece_internal_move.final_piece_bit, friendly_king, &enemy_king, &enemy_attacks, team_bitboards, board, &pieces_info);
+
+            // Get what the phsysical bitboard should be after the turn is made
+            let mut new_physical_bitboard = board.to_bitboard();
+
+            new_physical_bitboard ^= 1 << piece_internal_move.initial_piece_coordinates.bit; // Toggle initial piece bit
+
+            if !chess2::bit_on(new_physical_bitboard, piece_internal_move.final_piece_bit) {
+                new_physical_bitboard ^= 1 << piece_internal_move.final_piece_bit; // Toggle the final piece bit if there wasn't a capture
+            }
+
+            if !player_white {
+                new_physical_bitboard = chess2::flip_bitboard(new_physical_bitboard); // Flip the bitboard to physical board perspective
+            }
+
+            rprintln!("{}", new_physical_bitboard);
+
+            match new_turn_board {
+                Ok(new_board) => {
+
+                    // Show ai move
+                    if !players_turn {
+                        show_move(new_physical_bitboard, physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+                    }
+
+                    board = new_board;
+                },
+                Err(error) => {
+                    lcd.clear(&mut delay);
+                    
+                    match error {
+
+                        // When there is a win error break the game loop so a new game can be started
+                        TurnError::Win => {
+
+                            // Show ai move
+                            if !players_turn {
+                                show_move(new_physical_bitboard, physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+                            }
+
+                            // Print the winning team to the lcd
+                            lcd_print_team(&mut lcd, &mut delay, board.whites_move);
+                            lcd.print(&mut delay, " team wins");
+                            break;
+                        },
+                        TurnError::Draw => {
+                            lcd.print(&mut delay, "Game over (draw)");
+                            break;
+                        },
+
+                        // When there is an invalid move error make the player revert the turn and try again
+                        TurnError::InvalidMove => {
+                            lcd.print(&mut delay, "Invalid move");
+                            lcd.set_cursor(&mut delay, [0, 1]);
+                            lcd.print(&mut delay, "Please revert");
+
+                            show_move(physical_bitboard, physcial_bitboard_pm, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            continue;
+                        },
+                        TurnError::InvalidMoveCheck => {
+                            lcd.print(&mut delay, "King in check");
+                            lcd.set_cursor(&mut delay, [0, 1]);
+                            lcd.print(&mut delay, "Please revert");
+
+                            show_move(physical_bitboard, physcial_bitboard_pm, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            continue;
+                        },
+                    }
+                },
+            }
         }
     }
 }
@@ -257,14 +387,12 @@ fn lcd_print_team(lcd: &mut chess2::embedded::character_lcd::Lcd, delay: &mut De
     }
 }
 
-// Returns once pieces have been reverted back to their proper position after a player has made a turn error
-fn move_error<T: InputPin>(desired_bitboard: u64, mut current_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+// Only exits once the physical bitboard equals the desired bitboard
+// Lights leds to show the user what pieces they need to move to do this
+fn show_move<T: InputPin>(desired_bitboard: u64, mut current_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
     while current_bitboard != desired_bitboard {
         current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
 
-        // When the button is pressed toggle leds where pieces should / shouldn't be to help player fix the board
-        if button.press(cycle_counter) {
-            embedded::leds_from_bitboard(grid_sr, delay, desired_bitboard ^ current_bitboard, led_error_strobe_us);
-        }
+        embedded::leds_from_bitboard(grid_sr, delay, desired_bitboard ^ current_bitboard, 3000);
     }
 }

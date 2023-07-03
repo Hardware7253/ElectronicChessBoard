@@ -119,6 +119,17 @@ pub fn find_bit_on(num: u64, default: usize) -> usize {
     default
 }
 
+// Finds the bitboard index for a piece at a given bit
+pub fn find_board_index(board: &board::board_representation::Board, bit: usize) -> Result<usize, ()> {
+    for i in 0..board.board.len() {
+        if bit_on(board.board[i], bit) {
+            return Ok(i);
+        }
+    }
+    
+    Err(())
+}
+
 // Return true if 2 numbers have a bit in common
 pub fn common_bit(num1: u64, num2: u64) -> bool {
     let xor_nums = num1 ^ num2;
@@ -134,24 +145,25 @@ pub fn flip_bitboard_bit(bit: usize) -> usize {
     flipped.abs().try_into().unwrap()
 }
 
-#[derive(PartialEq, Debug)]
-pub struct PieceMove {
-    pub piece: board::board_representation::BoardCoordinates,
-    pub piece_move_bit: usize,
-}
 
-impl PieceMove {
-    pub fn new() -> Self {
-        PieceMove {
-            piece: board::board_representation::BoardCoordinates::new(),
-            piece_move_bit: 0,
+// Flip entire bitboard to enemy team persepctive
+pub fn flip_bitboard(bitboard: u64) -> u64 {
+
+    let mut flipped_bitboard = 0;
+    for bit in 0..64 {
+        let flipped_bit = flip_bitboard_bit(bit);
+
+        if bit_on(bitboard, bit) {
+            flipped_bitboard |= 1 << flipped_bit;
         }
     }
+
+    flipped_bitboard
 }
 
 // Finds a piece that has moved given a final and initial bitboard
 // Returns an error if more than one piece was moved
-pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board) -> Result<PieceMove, ()> {
+pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board) -> Result<algorithm::Move, ()> {
     
     // Return an error if pieces were removed from the board
     if bits_on(init_bitboard) != bits_on(final_bitboard) {
@@ -162,34 +174,27 @@ pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &
 
     let mut changed_bits = 0; // Stores the number of bits that have been changed from the inital to final bitboard
 
-    let mut piece_move = PieceMove {
-        piece: board::board_representation::BoardCoordinates {board_index: 0, bit: 0},
-        piece_move_bit: 0,
-    };
+    let mut piece_move = algorithm::Move::new();
 
     for i in 0..64 {
         if bit_on(change_bitboard, i) {
             changed_bits += 1;
 
             if bit_on(init_bitboard, i) {
-                piece_move.piece.bit = i; // Get initial piece bit
+                piece_move.initial_piece_coordinates.bit = i; // Get initial piece bit
             } else {
-                piece_move.piece_move_bit = i; // Get final piece bit
+                piece_move.final_piece_bit = i; // Get final piece bit
             }
         }
     }
-
+    
     // Return an error if multiple pieces moved, or no pieces moved
     if changed_bits != 2 {
         return Err(());
     }
 
     // Find the board index of the piece
-    for i in 0..init_board.board.len() {
-        if bit_on(init_board.board[i], piece_move.piece.bit) {
-            piece_move.piece.board_index = i;
-        }
-    }
+    piece_move.initial_piece_coordinates.board_index = find_board_index(init_board, piece_move.initial_piece_coordinates.bit).unwrap();
 
     Ok(piece_move)
 }

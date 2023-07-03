@@ -1,0 +1,3 @@
+cargo:rustc-link-search=/home/oxnh/Code/Rust/ElectronicChessBoard/Code/chess2/target/thumbv7m-none-eabi/debug/build/stm32f1-c6d44ac29ef25689/out
+cargo:rerun-if-changed=src/stm32f103/device.x
+cargo:rerun-if-changed=build.rs
