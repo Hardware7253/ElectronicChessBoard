@@ -161,6 +161,11 @@ pub fn flip_bitboard(bitboard: u64) -> u64 {
     flipped_bitboard
 }
 
+// Returns the number of pieces which have been added/removed from a bitboard
+pub fn find_piece_change(init_bitboard: u64, final_bitboard: u64) -> i8 {
+    bits_on(final_bitboard) as i8 - bits_on(init_bitboard) as i8
+}
+
 // Finds a piece that has moved given a final and initial bitboard
 // Returns an error if more than one piece was moved
 pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board) -> Result<algorithm::Move, ()> {
