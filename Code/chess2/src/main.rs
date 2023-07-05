@@ -83,8 +83,8 @@ fn main() -> ! {
     let mut button = embedded::button::Button {
         pin: gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade(),
         last_press_cycle: 0,
-        debounce_cycles: embedded::ms_to_cycles(80, clock_mhz as u64), // 80ms debounce
-        consecutive_cycles: embedded::ms_to_cycles(150, clock_mhz as u64), // When button presses are registered less than 200ms apart then the presses are sequential
+        debounce_cycles: embedded::ms_to_cycles(50, clock_mhz as u64), // 50ms debounce
+        consecutive_cycles: embedded::ms_to_cycles(150, clock_mhz as u64), // When button presses are registered less than 160ms apart then the presses are sequential
         c_presses: 0,
         consecutive_presses: 0, 
     };
@@ -103,14 +103,10 @@ fn main() -> ! {
         en_passant_target: None
     };
 
-    //rprintln!("{}", starting_board.to_bitboard());
-
     let pieces_info = chess2::piece::constants::gen(); // Generate piece info
 
     let mut max_search_ms: u64 = 1000; // Maximum time allowed for the computer to make a move
     let max_search_depth = 6; // Maximum minimax search depth
-
-    embedded::leds_from_bitboard(&mut grid_sr, &mut delay, u64::MAX, 30000);
 
     let mut opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
@@ -241,7 +237,7 @@ fn main() -> ! {
                                 lcd.set_cursor(&mut delay, [0, 1]);
                                 lcd.print(&mut delay, "Please revert");
 
-                                show_move(init_physical_bitboard, new_physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                                show_bitboard_move(init_physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
                                 lcd.clear(&mut delay);
                                 piece_removed = false;
                             },
@@ -340,24 +336,25 @@ fn main() -> ! {
             match new_turn_board {
                 Ok(new_board) => {
 
-                    // Show ai move
+                    // Show computer move
                     if !players_turn {
-                        show_move(new_physical_bitboard, physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+                        show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
                     }
 
                     board = new_board;
                 },
                 Err(error) => {
                     lcd.clear(&mut delay);
+                    lcd.home(&mut delay);
                     
                     match error {
 
                         // When there is a win error break the game loop so a new game can be started
                         TurnError::Win => {
 
-                            // Show ai move
+                            // Show computer move
                             if !players_turn {
-                                show_move(new_physical_bitboard, physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+                                show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
                             }
 
                             // Print the winning team to the lcd
@@ -376,7 +373,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_move(physical_bitboard, physical_bitboard_pm, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
                             continue;
                         },
                         TurnError::InvalidMoveCheck => {
@@ -384,7 +381,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_move(physical_bitboard, physical_bitboard_pm, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
                             continue;
                         },
                     }
@@ -405,10 +402,24 @@ fn lcd_print_team(lcd: &mut chess2::embedded::character_lcd::Lcd, delay: &mut De
 
 // Only exits once the physical bitboard equals the desired bitboard
 // Lights leds to show the user what pieces they need to move to do this
-fn show_move<T: InputPin>(desired_bitboard: u64, mut current_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+    
+    let mut current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
     while current_bitboard != desired_bitboard {
-        current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
-
+        current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay);
         embedded::leds_from_bitboard(grid_sr, delay, desired_bitboard ^ current_bitboard, 3000);
     }
+}
+
+// Only exits once the piece_physical move has been made on the board
+fn show_move<T: InputPin>(desired_bitboard: u64, piece_physical_move: &chess2::algorithm::Move, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+    let current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
+
+    // If the bit where the piece has to move is allready on then it is performing a capture
+    // When this happens make the player remove the capture piece first
+    if chess2::bit_on(current_bitboard, piece_physical_move.final_piece_bit) {
+        show_bitboard_move(desired_bitboard ^ 1 << piece_physical_move.final_piece_bit, grid_sr, hall_sensor, button, cycle_counter, delay);
+    }
+
+    show_bitboard_move(desired_bitboard, grid_sr, hall_sensor, button, cycle_counter, delay);
 }

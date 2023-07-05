@@ -459,7 +459,7 @@ pub mod embedded {
                 
                 self.shift_register.shift_out(delay, data as u64, true);
 
-                delay.delay_ms(1u32); // Ensure there is time inbetween character lcd writes
+                delay.delay_us(100u32); // Ensure there is time inbetween character lcd writes
             }
 
             // Initialze character lcd
