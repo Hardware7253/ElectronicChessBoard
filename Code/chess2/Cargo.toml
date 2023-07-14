@@ -8,6 +8,7 @@ opt-level = 'z'
 lto = true
 
 [dependencies]
+arrform = "0.1.1"
 cortex-m = "^0.6.3"       # Access to the generic ARM peripherals
 cortex-m-rt = "^0.6.12"   # Startup code for the ARM Core
 embedded-hal = "^0.2.4"   # Access to generic embedded functions (`set_high`)

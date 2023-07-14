@@ -9,6 +9,8 @@ use embedded_hal::digital::v2::InputPin;
 use stm32f1xx_hal as hal;
 use hal::{pac, pac::DWT, pac::DCB, delay::Delay, prelude::*};
 
+use arrform::{arrform, ArrForm};
+
 use rtt_target::{rprintln, rtt_init_print};
 
 
@@ -82,15 +84,16 @@ fn main() -> ! {
 
     let mut button = embedded::button::Button {
         pin: gpiob.pb13.into_pull_down_input(&mut gpiob.crh).downgrade(),
+        press_raw: false,
+        press_start_cycle: None,
+        long_press_cycles: embedded::ms_to_cycles(650, clock_mhz as u64), // Button needs to be held for atleast 650ms for a long press
+        long_press: false,
         last_press_cycle: 0,
         debounce_cycles: embedded::ms_to_cycles(50, clock_mhz as u64), // 50ms debounce
         consecutive_cycles: embedded::ms_to_cycles(150, clock_mhz as u64), // When button presses are registered less than 160ms apart then the presses are sequential
         c_presses: 0,
         consecutive_presses: 0, 
     };
-
-    // Turn on led and select hall sensor at bitboard bit 0
-    //chess2::embedded::write_grid(&mut grid_sr, &mut delay, 0, true);
 
     // Initiliaze board to starting board
     let starting_board = board_representation::Board {
@@ -105,13 +108,42 @@ fn main() -> ! {
 
     let pieces_info = chess2::piece::constants::gen(); // Generate piece info
 
-    let mut max_search_ms: u64 = 1000; // Maximum time allowed for the computer to make a move
+    let max_search_times: [u64; 8] = [1000, 3000, 5000, 10000, 20000, 30000, 50000, 100000]; // Options for maximum search times (ms) for the minimax algorithm
+    let mut search_time_index: usize = 2; // Index for the currently selected minimax search time
     let max_search_depth = 6; // Maximum minimax search depth
 
     let mut opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
+    // Testing how many clock cycles it takes for the computer the generate a move from a starting board position at a search depth of 4
+    /*
+    cycle_counter.update();
+    let start_cycles = cycle_counter.cycles;
+
+    algorithm::gen_best_move(
+        true,
+        &mut cycle_counter,
+        &start_cycles,
+        &chess2::embedded::ms_to_cycles(10000, clock_mhz as u64),
+        4,
+        0,
+        0,
+        algorithm::AlphaBeta::new(),
+        &opening_heatmap,
+        starting_board,
+        &pieces_info,
+    );
+
+    cycle_counter.update();
+    let end_cycles = cycle_counter.cycles;
+    let elapsed_cycles = end_cycles - start_cycles;
+
+    rprintln!("Computer move took {} clock cycles", elapsed_cycles);
+    rprintln!("(Rougly {} seconds)", elapsed_cycles / (clock_mhz as u64 * 1000000));
+    */
+
     loop {
         delay.delay_ms(1u16);
+        lcd.clear(&mut delay);
 
         // Get player team
         let mut player_white = true;
@@ -176,7 +208,7 @@ fn main() -> ! {
         // Game loop
         // Each loop represents one turn
         // The loop will break once the game has finished
-        loop {
+        'game: loop {
             lcd.clear(&mut delay);
 
             let players_turn = player_white == board.whites_move; // Determine wether the current turn is for the player or computer to make
@@ -216,7 +248,60 @@ fn main() -> ! {
                         init_physical_bitboard = physical_bitboard;
                     }
 
-                    if button.press(&mut cycle_counter) {
+                    let button_pressed = button.press(&mut cycle_counter);
+
+                    // When the button registers a long press open a menu to change the maximum time that the computer takes to search
+                    if button.long_press {
+                        lcd.clear(&mut delay);
+
+                        let mut increment_queued = false;
+                        let mut press_start_cycle: Option<u64> = None;
+                        loop {
+                            lcd.set_cursor(&mut delay, [0, 0]);
+                            lcd.print(&mut delay, "Engine search ms");
+                            lcd.set_cursor(&mut delay, [0, 1]);
+                    
+                            let af = arrform!(64, "{}", max_search_times[search_time_index]);
+                            lcd.print(&mut delay, af.as_str());
+
+                            let button_pressed = button.press(&mut cycle_counter);
+
+                            // Long press the button again to close the menu
+                            if button.long_press {
+                                break;
+                            }
+
+                            // If the button is pressed increment the search_time_index
+                            if button_pressed {
+                                increment_queued = true;
+                                press_start_cycle = button.press_start_cycle;
+                            }
+
+                            // Queue increment of the search time until after the button has been released
+                            // This avoids the value updating while the user is trying to long press to exit the menu
+                            if increment_queued && press_start_cycle != button.press_start_cycle {
+                                lcd.clear(&mut delay);
+                                search_time_index += 1;
+                                if search_time_index > (max_search_times.len() - 1) {
+                                    search_time_index = 0;
+                                }
+                                increment_queued = false;
+                            }
+                        }
+                        lcd.clear(&mut delay);
+                    }
+
+                    // When the button is pressed greater than 9 times consecutevily resign
+                    if button.consecutive_presses > 9 {
+                        break 'game;
+                    }
+
+                    if button_pressed {
+
+                        // Do nothing if the board has not changed
+                        if init_physical_bitboard == new_physical_bitboard {
+                            continue;
+                        }
                         
                         let player_move = chess2::find_bitboard_move(init_physical_bitboard, new_physical_bitboard, &board);
 
@@ -253,17 +338,16 @@ fn main() -> ! {
                 cycle_counter.update();
                 let start_cycles = cycle_counter.cycles;
 
-                // Generate a move which takes no longer than max_search_ms and has a maximum search depth of max_search_depth
+                // Generate a move which takes no longer than max_search_times[search_time_index] and has a maximum search depth of max_search_depth
                 piece_internal_move = algorithm::gen_best_move(
                     true,
                     &mut cycle_counter,
                     &start_cycles,
-                    &chess2::embedded::ms_to_cycles(max_search_ms, clock_mhz as u64),
+                    &chess2::embedded::ms_to_cycles(max_search_times[search_time_index], clock_mhz as u64),
                     max_search_depth,
                     0,
                     0,
                     algorithm::AlphaBeta::new(),
-                    //&[[0i16; 64]; 12],
                     &opening_heatmap,
                     board,
                     &pieces_info,
@@ -358,13 +442,15 @@ fn main() -> ! {
                             }
 
                             // Print the winning team to the lcd
+                            lcd.print(&mut delay, "Game over");
+                            lcd.set_cursor(&mut delay, [0, 1]);
                             lcd_print_team(&mut lcd, &mut delay, board.whites_move);
                             lcd.print(&mut delay, " team wins");
-                            break;
+                            break 'game;
                         },
                         TurnError::Draw => {
                             lcd.print(&mut delay, "Game over (draw)");
-                            break;
+                            break 'game;
                         },
 
                         // When there is an invalid move error make the player revert the turn and try again
@@ -386,6 +472,23 @@ fn main() -> ! {
                         },
                     }
                 },
+            }
+
+            // Draw game based on half move clock after the move has taken place
+            // This is so checkmates made this move take priority over the half move draw
+            if board.half_move_clock >= 100 {
+                lcd.clear(&mut delay);
+                lcd.set_cursor(&mut delay, [0, 0]);
+                lcd.print(&mut delay, "Game over (draw)");
+                lcd.set_cursor(&mut delay, [0, 1]);
+                lcd.print(&mut delay, "Fifty move rule");
+                break 'game;
+            }
+
+            // Once the early and mid phases of the game are done reset the opening heatmap
+            // After this point no heatmap will affect the computer moves
+            if board.half_moves > 20 {
+                opening_heatmap = [[0i16; 64]; 12];
             }
         }
     }

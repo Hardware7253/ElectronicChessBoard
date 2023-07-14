@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrform"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7cf566ecc5c9d82b973e81d30babf6583c9b497f86295c952d538c3254ef4e6"
+
+[[package]]
 name = "as-slice"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -57,6 +63,7 @@ dependencies = [
 name = "chess2"
 version = "0.1.0"
 dependencies = [
+ "arrform",
  "cortex-m 0.6.7",
  "cortex-m-rt",
  "embedded-hal",

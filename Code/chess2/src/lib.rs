@@ -400,6 +400,10 @@ pub mod embedded {
 
         pub struct Button {
             pub pin: Pxx<Input<PullDown>>, // Button pin
+            pub press_raw: bool,
+            pub press_start_cycle: Option<u64>, // The clock cycle that the button has been held down since
+            pub long_press_cycles: u64, // Cycles that must elapse between currenct clock cycle and press_start_cycle for a press to be considered a long press
+            pub long_press: bool,
             pub last_press_cycle: u64, // Processor cycles elapsed when the button was last pressed
             pub debounce_cycles: u64, // Minimum number of processor cycles between button pressed
             pub consecutive_cycles: u64, // After this many cycles have elapsed between the last button press and current button press the press is no longer sequential
@@ -412,19 +416,40 @@ pub mod embedded {
             // Returns true only when the button is pressed, so true will not be returned when the button is held down or bouncing
             // This functionality is dependant on the buttons debounce_cycles
             pub fn press(&mut self, counter: &mut cycle_counter::Counter) -> bool {
+                self.long_press = false;
                 counter.update();
 
                 let mut pressed = false;
-                if digital_read(&self.pin) {
+                let pin_high = digital_read(&self.pin);
+                self.press_raw = pin_high;
+                if pin_high {
+
+                    // Update press start cycle
+                    match self.press_start_cycle {
+                        Some(_) => (),
+                        None => self.press_start_cycle = Some(counter.cycles),
+                    }
                     
                     // Return true if the button has been pressed and isn't bouncing
                     if counter.cycles > (self.last_press_cycle + self.debounce_cycles) {
                         pressed = true;
                     }
                     self.last_press_cycle = counter.cycles;
+                } else {
+
+                    // If the button is released check for a long press
+                    match self.press_start_cycle {
+                        Some(cycle) => {
+                            if (counter.cycles - cycle) >= self.long_press_cycles {
+                                self.long_press = true;
+                            }
+                        },
+                        None => (),
+                    }
+                    self.press_start_cycle = None; // When the button is not pressed there is no press start cycle
                 }
 
-                // Detect sequential presses
+                // Detect consecutive presses
                 if (counter.cycles - self.last_press_cycle) < self.consecutive_cycles {
                     if pressed {
                         self.c_presses += 1;
@@ -459,7 +484,7 @@ pub mod embedded {
                 
                 self.shift_register.shift_out(delay, data as u64, true);
 
-                delay.delay_us(100u32); // Ensure there is time inbetween character lcd writes
+                delay.delay_us(700u32); // Ensure there is time inbetween character lcd writes
             }
 
             // Initialze character lcd
