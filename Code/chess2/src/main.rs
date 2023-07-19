@@ -115,7 +115,6 @@ fn main() -> ! {
     let mut opening_heatmap = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 10, 1, 18, 10, 9, 9, 1, 0, 1, 33, 61, 475, 338, 22, 6, 5, 51, 142, 1144, 2288, 2246, 392, 88, 80, 88, 74, 361, 111, 276, 124, 322, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 35, 32, 94, 499, 3, 0], [1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 19, 0, 2, 0, 0, 15, 1, 2, 7, 0, 0, 1, 31, 0, 19, 145, 2, 79, 0, 9, 0, 11, 268, 58, 0, 1, 7, 16, 17, 1470, 1, 3, 2054, 9, 15, 0, 0, 2, 115, 62, 1, 0, 0, 0, 1, 0, 0, 5, 2, 2, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 22, 1, 0, 0, 1, 35, 0, 0, 17, 0, 2, 0, 314, 1, 13, 2, 0, 292, 0, 139, 2, 509, 2, 0, 47, 0, 35, 6, 108, 1, 162, 124, 1, 2, 3, 0, 51, 19, 57, 148, 1, 205, 0, 1, 0, 2, 0, 0, 3, 0, 0], [0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 3, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 4, 1, 2, 0, 24, 22, 0, 13, 32, 3, 2, 24, 3, 0, 48, 7, 17, 6, 42, 0, 0, 0, 0, 66, 49, 67, 3, 0, 0, 0, 1, 0, 3, 3, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 9, 4, 1, 0, 0, 0, 23, 4, 0, 26, 498, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 348, 125, 418, 716, 867, 40, 525, 86, 17, 238, 834, 1360, 1326, 216, 134, 18, 0, 13, 174, 512, 190, 170, 68, 4, 1, 0, 34, 3, 4, 37, 4, 0, 0, 6, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 8, 3, 3, 17, 458, 5, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0, 13, 0, 2, 1, 1, 8, 0, 0, 4, 3, 219, 58, 2, 1, 0, 21, 32, 1057, 15, 1, 1874, 4, 29, 56, 0, 8, 130, 31, 3, 1, 10, 0, 9, 4, 40, 190, 2, 21, 0, 0, 0, 31, 0, 2, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0], [0, 0, 0, 0, 1, 3, 0, 1, 1, 74, 0, 44, 307, 0, 387, 2, 20, 31, 2, 44, 56, 5, 9, 5, 27, 0, 241, 0, 2, 79, 3, 1, 0, 297, 3, 5, 2, 0, 98, 4, 0, 0, 60, 3, 1, 8, 0, 3, 0, 0, 0, 5, 1, 3, 1, 1, 0, 1, 0, 1, 0, 3, 0, 0], [1, 1, 2, 4, 5, 0, 0, 0, 0, 0, 36, 10, 62, 0, 0, 0, 0, 28, 0, 10, 2, 36, 6, 0, 79, 0, 0, 53, 5, 4, 12, 2, 0, 1, 1, 9, 3, 2, 0, 51, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 7, 0, 4, 458, 0, 0, 0, 0, 0, 5, 17, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
     // Testing how many clock cycles it takes for the computer the generate a move from a starting board position at a search depth of 4
-    /*
     cycle_counter.update();
     let start_cycles = cycle_counter.cycles;
 
@@ -123,7 +122,7 @@ fn main() -> ! {
         true,
         &mut cycle_counter,
         &start_cycles,
-        &chess2::embedded::ms_to_cycles(10000, clock_mhz as u64),
+        &chess2::embedded::ms_to_cycles(100000, clock_mhz as u64),
         4,
         0,
         0,
@@ -139,7 +138,6 @@ fn main() -> ! {
 
     rprintln!("Computer move took {} clock cycles", elapsed_cycles);
     rprintln!("(Rougly {} seconds)", elapsed_cycles / (clock_mhz as u64 * 1000000));
-    */
 
     loop {
         delay.delay_ms(1u16);
@@ -305,6 +303,8 @@ fn main() -> ! {
                         
                         let player_move = chess2::find_bitboard_move(init_physical_bitboard, new_physical_bitboard, &board);
 
+                        button.press(&mut cycle_counter);
+
                         match player_move {
 
                             // If the move was ok break the loop
@@ -325,6 +325,7 @@ fn main() -> ! {
                                 show_bitboard_move(init_physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
                                 lcd.clear(&mut delay);
                                 piece_removed = false;
+                                button.press(&mut cycle_counter);
                             },
                         }                        
                     }
@@ -351,8 +352,7 @@ fn main() -> ! {
                     &opening_heatmap,
                     board,
                     &pieces_info,
-                ).piece_move.unwrap();
-                
+                ).piece_move.unwrap();                
             }
 
             // Set piece_internal / piece_physical move (whichever hasn't been updated yet)
@@ -460,6 +460,7 @@ fn main() -> ! {
                             lcd.print(&mut delay, "Please revert");
 
                             show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            button.press(&mut cycle_counter);
                             continue;
                         },
                         TurnError::InvalidMoveCheck => {
@@ -468,6 +469,7 @@ fn main() -> ! {
                             lcd.print(&mut delay, "Please revert");
 
                             show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            button.press(&mut cycle_counter);
                             continue;
                         },
                     }
@@ -490,6 +492,8 @@ fn main() -> ! {
             if board.half_moves > 20 {
                 opening_heatmap = [[0i16; 64]; 12];
             }
+
+            button.press(&mut cycle_counter);
         }
     }
 }
