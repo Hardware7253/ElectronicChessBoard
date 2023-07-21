@@ -390,7 +390,7 @@ pub mod embedded {
                 }
                 self.last_cycle_count = dwt_cycles;
 
-                self.cycles = (self.cycle_resets * u32::MAX) as u64 + dwt_cycles as u64; // Update cycle count
+                self.cycles = (self.cycle_resets as u64 * u32::MAX as u64) + dwt_cycles as u64; // Update cycle count
             }
         }
     }
@@ -479,12 +479,12 @@ pub mod embedded {
         impl Lcd {
 
             // Writes a byte to a character lcd, data_input sets register select pin
-            pub fn write(&mut self, delay: &mut Delay, data_input: bool, data: u8) {
+            pub fn write(&mut self, delay: &mut Delay, write_sleep_ms: u32, data_input: bool, data: u8) {
                 digital_write(&mut self.register_select, data_input); // Set data_input / instruction input
                 
                 self.shift_register.shift_out(delay, data as u64, true);
 
-                delay.delay_us(700u32); // Ensure there is time inbetween character lcd writes
+                delay.delay_us(write_sleep_ms); // Ensure there is time inbetween character lcd writes
             }
 
             // Initialze character lcd
@@ -492,7 +492,7 @@ pub mod embedded {
                 self.shift_register.clock.set_low().ok();
                 self.shift_register.latch.set_low().ok();
 
-                self.write(delay, false, 0b00111000); // Initialize lcd with 8-bit bus, 2 lines, and 5x8 dot format
+                self.write(delay, 1, false, 0b00111000); // Initialize lcd with 8-bit bus, 2 lines, and 5x8 dot format
 
                 self.clear(delay); // Clear dispaly
                 self.home(delay);  // Home cursor
@@ -515,17 +515,17 @@ pub mod embedded {
                     write_byte += 1;
                 }
 
-                self.write(delay, false, write_byte);
+                self.write(delay, 1, false, write_byte);
             }
 
             // Clear display
             pub fn clear(&mut self, delay: &mut Delay) {
-                self.write(delay, false, 0b00000001);
+                self.write(delay, 700, false, 0b00000001);
             }
 
             // Home cursor
             pub fn home(&mut self, delay: &mut Delay) {
-                self.write(delay, false, 0b00000010);
+                self.write(delay, 700, false, 0b00000010);
             }
 
             // Shift cursor/display once in the specified direction
@@ -540,7 +540,7 @@ pub mod embedded {
                     write_byte += 0b00000100;
                 }
 
-                self.write(delay, false, write_byte);
+                self.write(delay, 1, false, write_byte);
             }
 
             // Sets ddram (cursor) address
@@ -548,7 +548,7 @@ pub mod embedded {
                 let mut write_byte: u8 = 0b10000000;
                 write_byte ^= ddram_address;
 
-                self.write(delay, false, write_byte);
+                self.write(delay, 1, false, write_byte);
             }
 
             // Sets the cursor position with cartesian coordinates
@@ -566,7 +566,7 @@ pub mod embedded {
             // Prints a string to the lcd
             pub fn print(&mut self, delay: &mut Delay, string: &str) {
                 for c in string.chars() {
-                    self.write(delay, true, c as u8);
+                    self.write(delay, 1, true, c as u8);
                 }
             }
         }
