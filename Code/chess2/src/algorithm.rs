@@ -1,6 +1,3 @@
-#![no_std]
-#![no_main]
-
 use core::cmp::PartialOrd;
 use rtt_target::{rprintln, rtt_init_print};
 
@@ -83,7 +80,6 @@ pub fn gen_best_move(
 ) -> AlphaBeta {
     use crate::board::move_generator;
     use crate::board::move_generator::TurnError;
-    use stm32f1xx_hal::pac::DWT;
 
     // If current depth and search depth are equal stop searching down the move tree
     // Or stop searching if the time elapsed is greater than the maximum allowed time
@@ -199,7 +195,7 @@ pub fn gen_best_move(
 
                 // Update alpha/beta with value of game ending if the game ended
                 let mut branch_value;
-                let mut valid_move;
+                let valid_move;
 
                 match error {
                     TurnError::Win => {branch_value = i8::MAX; valid_move = true},

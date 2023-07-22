@@ -1,6 +1,3 @@
-#![no_std]
-#![no_main]
-
 use core::convert::TryFrom;
 use core::convert::TryInto;
 
@@ -483,10 +480,7 @@ pub mod move_generator {
                     use_checking_piece = true;
                 },
                 None => {
-                    checking_piece = BoardCoordinates {
-                        board_index: 0,
-                        bit: 0,
-                    };
+                    checking_piece = BoardCoordinates::new();
                     use_checking_piece = false;
                 }
             }
@@ -513,7 +507,7 @@ pub mod move_generator {
                         bit: initial_bit,
                     };
                                         
-                    // If using checking piece generate the piece attacks
+                    // If use_checking_piece generate the piece attacks
                     // Else generate the piece moves
                     // This is because the attacks are needed to check for checkmate, and moves are needed to check for stalemate
                     let piece_attacks = gen_piece(&piece_coordinates, None, &team_bitboards, use_checking_piece, board, pieces_info);
@@ -544,23 +538,16 @@ pub mod move_generator {
                                     let mut team_bitboards = team_bitboards;
                                     team_bitboards.friendly_team ^= 1 << initial_bit | 1 << final_bit; // Move piece on friendly team bitboard
                                     team_bitboards.enemy_team ^= 1 << checking_piece.bit; // Remove captured piece from enemy teams bitboard
-    
+                                    
+                                    // Regenerate enemy attacks after capturing the checking piece
                                     let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, board, pieces_info);
-    
-                                    // If the checking piece is the same as the original checking piece then there is no mate
-                                    let mut new_checking_piece = None;
-                                    for i in 0..enemy_attacks.checking_pieces_no {
-                                        if enemy_attacks.checking_pieces[i] != Some(checking_piece) {
-                                            new_checking_piece = enemy_attacks.checking_pieces[i];
-                                        }
-                                    }
-
-                                    match new_checking_piece {
-                                        Some(piece) => {
-                                            // If there is a new checking piece then the move put the king into check, so it is still mate
+                        
+                                    // If there is a new checking piece after capturing the original one then the king is in mate, otherwise the king is not in mate
+                                    match enemy_attacks.checking_pieces[0] {
+                                        Some(_) => {
                                             continue;
                                         },
-                                        None => return false, // If there is no checking piece then the king is not in mate
+                                        None => return false,
                                     };
                                 } else { // If the checking piece cannot be captured, check if its attack can be blocked
                                     if bit_on(checking_piece_attacks, final_bit) { // True if the friendly piece moved into the checking pieces path

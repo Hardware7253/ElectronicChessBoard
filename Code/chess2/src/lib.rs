@@ -240,7 +240,7 @@ pub mod embedded {
     use embedded_hal::digital::v2::{InputPin, OutputPin};
     use stm32f1xx_hal as hal;
     use hal::gpio::{Pxx, PushPull, Output, Input, PullDown};
-    use hal::{pac, pac::DWT, delay::Delay, prelude::*};
+    use hal::{pac::DWT, delay::Delay, prelude::*};
 
     use rtt_target::{rprintln, rtt_init_print};
 

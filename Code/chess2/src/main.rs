@@ -4,10 +4,9 @@
 use panic_halt as _;
 
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::digital::v2::InputPin;
 use stm32f1xx_hal as hal;
-use hal::{pac, pac::DWT, pac::DCB, delay::Delay, prelude::*};
+use hal::{pac, delay::Delay, prelude::*};
 
 use arrform::{arrform, ArrForm};
 
@@ -30,7 +29,7 @@ fn main() -> ! {
     // Get access to RCC, FLASH, AFIO, and GPIO
     let mut rcc = dp.RCC.constrain();
     let mut flash = dp.FLASH.constrain();
-    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
+    //let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
     let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
 
@@ -219,7 +218,6 @@ fn main() -> ! {
             let mut piece_physical_move = algorithm::Move::new();
 
             physical_bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Get bitboard of pieces on the physical board before a piece has been moved
-            let mut physical_bitboard_pm: u64 = 0; // Bitboard of pieces on the physical board after a piece has been moved
 
             // Get move from player / computer
             if players_turn {
@@ -316,7 +314,6 @@ fn main() -> ! {
                             // If the move was ok break the loop
                             Ok(player_move) => {
                                 piece_physical_move = player_move;
-                                physical_bitboard_pm = new_physical_bitboard;
                                 break;
                             },
 
@@ -328,7 +325,7 @@ fn main() -> ! {
                                 lcd.set_cursor(&mut delay, [0, 1]);
                                 lcd.print(&mut delay, "Please revert");
 
-                                show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                                show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
                                 lcd.clear(&mut delay);
                                 piece_removed = false;
                                 button.press(&mut cycle_counter);
@@ -422,7 +419,7 @@ fn main() -> ! {
 
                     // Show computer move
                     if !players_turn {
-                        show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+                        show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut delay)
                     }
 
                     board = new_board;
@@ -432,26 +429,25 @@ fn main() -> ! {
                     lcd.home(&mut delay);
                     
                     match error {
-
-                        // When there is a win error break the game loop so a new game can be started
                         TurnError::Win => {
-
-                            // Get what the phsysical bitboard should be after the turn is made
-                            let mut new_physical_bitboard = board.to_bitboard();
-
-                            new_physical_bitboard ^= 1 << piece_internal_move.initial_piece_coordinates.bit; // Toggle initial piece bit
-
-                            if !chess2::bit_on(new_physical_bitboard, piece_internal_move.final_piece_bit) {
-                                new_physical_bitboard ^= 1 << piece_internal_move.final_piece_bit; // Toggle the final piece bit if there wasn't a capture
-                            }
-
-                            if !player_white {
-                                new_physical_bitboard = chess2::flip_bitboard(new_physical_bitboard); // Flip the bitboard to physical board perspective
-                            }
 
                             // Show computer move
                             if !players_turn {
-                                show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay)
+
+                                // Get what the phsysical bitboard should be after the turn is made
+                                let mut new_physical_bitboard = board.to_bitboard();
+
+                                new_physical_bitboard ^= 1 << piece_internal_move.initial_piece_coordinates.bit; // Toggle initial piece bit
+
+                                if !chess2::bit_on(new_physical_bitboard, piece_internal_move.final_piece_bit) {
+                                    new_physical_bitboard ^= 1 << piece_internal_move.final_piece_bit; // Toggle the final piece bit if there wasn't a capture
+                                }
+
+                                if !player_white {
+                                    new_physical_bitboard = chess2::flip_bitboard(new_physical_bitboard); // Flip the bitboard to physical board perspective
+                                }
+
+                                show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut delay)
                             }
 
                             // Print the winning team to the lcd
@@ -459,11 +455,23 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd_print_team(&mut lcd, &mut delay, board.whites_move);
                             lcd.print(&mut delay, " team wins");
-                            break 'game;
+
+                            // Once the player presses the button end the game
+                            loop {
+                                if button.press(&mut cycle_counter) {
+                                    break 'game;
+                                }
+                            }
                         },
                         TurnError::Draw => {
                             lcd.print(&mut delay, "Game over (draw)");
-                            break 'game;
+
+                            // Once the player presses the button end the game
+                            loop {
+                                if button.press(&mut cycle_counter) {
+                                    break 'game;
+                                }
+                            }
                         },
 
                         // When there is an invalid move error make the player revert the turn and try again
@@ -472,7 +480,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
                             button.press(&mut cycle_counter);
                             continue;
                         },
@@ -481,7 +489,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut button, &mut cycle_counter, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
                             button.press(&mut cycle_counter);
                             continue;
                         },
@@ -522,7 +530,7 @@ fn lcd_print_team(lcd: &mut chess2::embedded::character_lcd::Lcd, delay: &mut De
 
 // Only exits once the physical bitboard equals the desired bitboard
 // Lights leds to show the user what pieces they need to move to do this
-fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, delay: &mut Delay) {
     
     let mut current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
     while current_bitboard != desired_bitboard {
@@ -532,14 +540,14 @@ fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded
 }
 
 // Only exits once the piece_physical move has been made on the board
-fn show_move<T: InputPin>(desired_bitboard: u64, piece_physical_move: &chess2::algorithm::Move, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, button: &mut embedded::button::Button, cycle_counter: &mut embedded::cycle_counter::Counter, delay: &mut Delay) {
+fn show_move<T: InputPin>(desired_bitboard: u64, piece_physical_move: &chess2::algorithm::Move, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, delay: &mut Delay) {
     let current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
 
     // If the bit where the piece has to move is allready on then it is performing a capture
     // When this happens make the player remove the capture piece first
     if chess2::bit_on(current_bitboard, piece_physical_move.final_piece_bit) {
-        show_bitboard_move(desired_bitboard ^ 1 << piece_physical_move.final_piece_bit, grid_sr, hall_sensor, button, cycle_counter, delay);
+        show_bitboard_move(desired_bitboard ^ 1 << piece_physical_move.final_piece_bit, grid_sr, hall_sensor, delay);
     }
 
-    show_bitboard_move(desired_bitboard, grid_sr, hall_sensor, button, cycle_counter, delay);
+    show_bitboard_move(desired_bitboard, grid_sr, hall_sensor, delay);
 }

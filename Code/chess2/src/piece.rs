@@ -1,6 +1,3 @@
-#![no_std]
-#![no_main]
-
 pub mod constants {
 
     pub struct PieceInfo {
