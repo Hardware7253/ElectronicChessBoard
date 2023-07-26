@@ -533,14 +533,17 @@ pub mod move_generator {
                         if bit_on(piece_attacks.moves_bitboard | pawn_moves_bitboard, final_bit) { // true if final_bit can be moved to
                             if use_checking_piece {
                                 if bit_on(piece_attacks.moves_bitboard, checking_piece.bit) && final_bit == checking_piece.bit { // true if the checking piece can be captured
-    
-                                    // If the king is not in check after capturing the checking piece then it is not mate
+                                    // Update team bitboards and main board with piece move and piece captures
                                     let mut team_bitboards = team_bitboards;
                                     team_bitboards.friendly_team ^= 1 << initial_bit | 1 << final_bit; // Move piece on friendly team bitboard
                                     team_bitboards.enemy_team ^= 1 << checking_piece.bit; // Remove captured piece from enemy teams bitboard
+
+                                    let mut board = *board;
+                                    board.board[checking_piece.board_index] ^= 1 << checking_piece.bit; // Remove captured piece from board
+                                    board.board[board_index] ^= 1 << initial_bit | 1 << final_bit; // Move friendly piece on board
                                     
                                     // Regenerate enemy attacks after capturing the checking piece
-                                    let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, board, pieces_info);
+                                    let enemy_attacks = gen_enemy_attacks(&king, team_bitboards, &board, pieces_info);
                         
                                     // If there is a new checking piece after capturing the original one then the king is in mate, otherwise the king is not in mate
                                     match enemy_attacks.checking_pieces[0] {

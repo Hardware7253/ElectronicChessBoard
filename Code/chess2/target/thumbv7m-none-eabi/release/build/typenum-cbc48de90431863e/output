@@ -1,0 +1,3 @@
+cargo:rerun-if-changed=build/main.rs
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/home/oxnh/Code/Rust/ElectronicChessBoard/Code/chess2/target/thumbv7m-none-eabi/release/build/typenum-cbc48de90431863e/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/home/oxnh/Code/Rust/ElectronicChessBoard/Code/chess2/target/thumbv7m-none-eabi/release/build/typenum-cbc48de90431863e/out/op.rs

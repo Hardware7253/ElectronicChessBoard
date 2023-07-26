@@ -521,6 +521,7 @@ pub mod embedded {
             // Clear display
             pub fn clear(&mut self, delay: &mut Delay) {
                 self.write(delay, 700, false, 0b00000001);
+                delay.delay_ms(1u16);
             }
 
             // Home cursor
