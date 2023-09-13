@@ -6,6 +6,7 @@ use core::convert::TryInto;
 
 use core::result::Result::Ok;
 use core::result::Result::Err;
+use rtt_target::{rprintln, rtt_init_print};
 
 pub mod board;
 pub mod piece;
@@ -121,7 +122,7 @@ pub fn find_bit_on(num: u64, default: usize) -> usize {
 
 // Finds the bitboard index for a piece at a given bit
 pub fn find_board_index(board: &board::board_representation::Board, bit: usize) -> Result<usize, ()> {
-    for i in 0..board.board.len() {
+    for i in 0..(board.board.len() - 1) {
         if bit_on(board.board[i], bit) {
             return Ok(i);
         }
@@ -168,11 +169,10 @@ pub fn find_piece_change(init_bitboard: u64, final_bitboard: u64) -> i8 {
 
 // Finds a piece that has moved given a final and initial bitboard
 // Returns an error if more than one piece was moved
-pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board) -> Result<algorithm::Move, ()> {
-    
+pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &board::board_representation::Board, player_white: bool) -> Result<algorithm::Move, u8> {
     // Return an error if pieces were removed from the board
     if bits_on(init_bitboard) != bits_on(final_bitboard) {
-        return Err(());
+        return Err(2);
     }
 
     let change_bitboard = init_bitboard ^ final_bitboard; // Bitboard of the bits that have changed from the initial to final bitboard
@@ -195,13 +195,29 @@ pub fn find_bitboard_move(init_bitboard: u64, final_bitboard: u64, init_board: &
     
     // Return an error if multiple pieces moved, or no pieces moved
     if changed_bits != 2 {
-        return Err(());
+        return Err(changed_bits);
     }
 
-    // Find the board index of the piece
-    piece_move.initial_piece_coordinates.board_index = find_board_index(init_board, piece_move.initial_piece_coordinates.bit).unwrap();
+    // Set the search bit to the initial piece bit
+    // Flip th bit if the player isn't the white team
+    // Because the black team is represented on the opposite side of the board in the board representation
+    let mut search_bit = piece_move.initial_piece_coordinates.bit;
+    if !player_white {
+        search_bit = flip_bitboard_bit(search_bit);
+    }
 
-    Ok(piece_move)
+    // Find the board index of the search bit
+    let board_index = find_board_index(init_board, search_bit);
+
+    // If an index was found return the piece move, otherwise return an error
+    match board_index {
+        Ok(index) => {
+            piece_move.initial_piece_coordinates.board_index = index;
+            return Ok(piece_move);
+        },
+
+        Err(()) => return Err(changed_bits),
+    }
 }
 
 // A struct containing bitboards which have the locations of all pieces on the friendly and enemy team
@@ -241,8 +257,6 @@ pub mod embedded {
     use stm32f1xx_hal as hal;
     use hal::gpio::{Pxx, PushPull, Output, Input, PullDown};
     use hal::{pac::DWT, delay::Delay, prelude::*};
-
-    use rtt_target::{rprintln, rtt_init_print};
 
     // Struct for shift register pins
     pub struct ShiftRegister {
@@ -335,7 +349,14 @@ pub mod embedded {
 
     // Turns on leds on the board according to the given bitboard
     // Simulates turning multiple leds on simultaneously by turning them off and on in quick succesion
-    pub fn leds_from_bitboard(shift_register: &mut ShiftRegister, delay: &mut Delay, bitboard: u64, led_on_time_us: u32) {
+    // When proportional on time is true the led_on_time_us is changed based on how many leds should be turned on
+    pub fn leds_from_bitboard(shift_register: &mut ShiftRegister, delay: &mut Delay, bitboard: u64, mut led_on_time_us: u32, proportional_on_time: bool) {
+        let bits_on = bits_on(bitboard);
+
+        if proportional_on_time && bits_on > 0 {
+            led_on_time_us /= bits_on as u32;
+        }
+
         for i in 0..64 {
             if bit_on(bitboard, i) {
                 write_grid(shift_register, delay, i, true); // Turn led on

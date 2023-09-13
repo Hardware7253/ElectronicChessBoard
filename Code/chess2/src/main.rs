@@ -107,6 +107,8 @@ fn main() -> ! {
 
     let pieces_info = chess2::piece::constants::gen(); // Generate piece info
 
+    let led_strobe_us: u32 = 200000; // Led strobe time (on time) in micro seconds
+
     let max_search_times: [u64; 8] = [1000, 3000, 5000, 10000, 20000, 30000, 50000, 100000]; // Options for maximum search times (ms) for the minimax algorithm
     let mut search_time_index: usize = 2; // Index for the currently selected minimax search time
     let max_search_depth = 6; // Maximum minimax search depth
@@ -193,8 +195,9 @@ fn main() -> ! {
                 physical_bitboard = embedded::read_board_halls(&mut grid_sr, &hall_sensor, &mut delay); // Update physical bitboard
 
                 // If the button is pressed highlight the positions where pieces have to placed
-                if button.press(&mut cycle_counter) {
-                    embedded::leds_from_bitboard(&mut grid_sr, &mut delay, expected_board ^ physical_bitboard, 30000);
+                button.press(&mut cycle_counter);
+                if button.press_raw {
+                    embedded::leds_from_bitboard(&mut grid_sr, &mut delay, expected_board ^ physical_bitboard, led_strobe_us, true);
                 }
 
                 delay.delay_ms(1u16);
@@ -261,10 +264,10 @@ fn main() -> ! {
                         let mut press_start_cycle: Option<u64> = None;
                         loop {
                             lcd.set_cursor(&mut delay, [0, 0]);
-                            lcd.print(&mut delay, "Engine search ms");
+                            lcd.print(&mut delay, "Engine search");
                             lcd.set_cursor(&mut delay, [0, 1]);
                     
-                            let af = arrform!(64, "{}", max_search_times[search_time_index]);
+                            let af = arrform!(64, "{}s", max_search_times[search_time_index] / 1000);
                             lcd.print(&mut delay, af.as_str());
 
                             let button_pressed = button.press(&mut cycle_counter);
@@ -307,7 +310,7 @@ fn main() -> ! {
                             continue;
                         }
                         
-                        let player_move = chess2::find_bitboard_move(init_physical_bitboard, new_physical_bitboard, &board);
+                        let player_move = chess2::find_bitboard_move(init_physical_bitboard, new_physical_bitboard, &board, player_white);
 
                         button.press(&mut cycle_counter);
 
@@ -320,14 +323,14 @@ fn main() -> ! {
                             },
 
                             // If there was an error with the move make the player revert the move so they can try again
-                            Err(_) => {
+                            Err(pieces_moved) => {
                                 lcd.clear(&mut delay);
                                 lcd.set_cursor(&mut delay, [0, 0]);
                                 lcd.print(&mut delay, "Invalid move");
                                 lcd.set_cursor(&mut delay, [0, 1]);
                                 lcd.print(&mut delay, "Please revert");
 
-                                show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
+                                show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, led_strobe_us, &mut delay);
                                 lcd.clear(&mut delay);
                                 piece_removed = false;
                                 button.press(&mut cycle_counter);
@@ -423,7 +426,7 @@ fn main() -> ! {
 
                     // Show computer move
                     if !players_turn {
-                        show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut delay)
+                        show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, led_strobe_us, &mut delay)
                     }
 
                     board = new_board;
@@ -448,7 +451,7 @@ fn main() -> ! {
                                     new_physical_bitboard = chess2::flip_bitboard(new_physical_bitboard); // Flip the bitboard to physical board perspective
                                 }
 
-                                show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, &mut delay)
+                                show_move(new_physical_bitboard, &piece_physical_move, &mut grid_sr, &hall_sensor, led_strobe_us, &mut delay)
                             }
 
                             // Print the winning team to the lcd
@@ -467,6 +470,8 @@ fn main() -> ! {
                             }
                         },
                         TurnError::Draw => {
+                            lcd.clear(&mut delay);
+                            lcd.set_cursor(&mut delay, [0, 0]);
                             lcd.print(&mut delay, "Game over (draw)");
 
                             // Once the player presses the button end the game
@@ -485,7 +490,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, led_strobe_us, &mut delay);
                             button.press(&mut cycle_counter);
                             continue;
                         },
@@ -496,7 +501,7 @@ fn main() -> ! {
                             lcd.set_cursor(&mut delay, [0, 1]);
                             lcd.print(&mut delay, "Please revert");
 
-                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, &mut delay);
+                            show_bitboard_move(physical_bitboard, &mut grid_sr, &hall_sensor, led_strobe_us, &mut delay);
                             button.press(&mut cycle_counter);
                             continue;
                         },
@@ -537,24 +542,24 @@ fn lcd_print_team(lcd: &mut chess2::embedded::character_lcd::Lcd, delay: &mut De
 
 // Only exits once the physical bitboard equals the desired bitboard
 // Lights leds to show the user what pieces they need to move to do this
-fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, delay: &mut Delay) {
+fn show_bitboard_move<T: InputPin>(desired_bitboard: u64, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, led_strobe_us: u32, delay: &mut Delay) {
     
     let mut current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
     while current_bitboard != desired_bitboard {
         current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay);
-        embedded::leds_from_bitboard(grid_sr, delay, desired_bitboard ^ current_bitboard, 3000);
+        embedded::leds_from_bitboard(grid_sr, delay, desired_bitboard ^ current_bitboard, led_strobe_us, true);
     }
 }
 
 // Only exits once the piece_physical move has been made on the board
-fn show_move<T: InputPin>(desired_bitboard: u64, piece_physical_move: &chess2::algorithm::Move, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, delay: &mut Delay) {
+fn show_move<T: InputPin>(desired_bitboard: u64, piece_physical_move: &chess2::algorithm::Move, grid_sr: &mut embedded::ShiftRegister, hall_sensor: &T, led_strobe_us: u32, delay: &mut Delay) {
     let current_bitboard = embedded::read_board_halls(grid_sr, hall_sensor, delay); // Get bitboard of pieces on the physical board
 
-    // If the bit where the piece has to move is allready on then it is performing a capture
+    // If the bit where the piece has to move is allready occupied then the piece is performing a capture
     // When this happens make the player remove the capture piece first
     if chess2::bit_on(current_bitboard, piece_physical_move.final_piece_bit) {
-        show_bitboard_move(desired_bitboard ^ 1 << piece_physical_move.final_piece_bit, grid_sr, hall_sensor, delay);
+        show_bitboard_move(desired_bitboard ^ 1 << piece_physical_move.final_piece_bit, grid_sr, hall_sensor, led_strobe_us, delay);
     }
 
-    show_bitboard_move(desired_bitboard, grid_sr, hall_sensor, delay);
+    show_bitboard_move(desired_bitboard, grid_sr, hall_sensor, led_strobe_us, delay);
 }
