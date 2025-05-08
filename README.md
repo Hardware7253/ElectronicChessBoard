@@ -1,6 +1,8 @@
 # Electronic Chess Board
 Welcome to the Electronic Chess Board project repository. This project combines an electronic chess board with a chess engine, offering a more tactile way to train against an AI opponent.
 
+![image](https://github.com/user-attachments/assets/061d4fae-8af6-401d-9f97-f5aa19f0b5ae)
+
 ## Overview
 The project's core objective is to deliver an interactive chess experience, allowing users to engage in matches against an AI opponent.
 This AI opponent employs a minimax algorithm for strategic decision-making, with a variable search depth of 3 to 6 based on time availability. 
